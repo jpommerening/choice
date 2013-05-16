@@ -27,7 +27,7 @@ surprisingly well. I don't really care _what_ parses the options.
 
 Let's drive this home with a few examples.
 
-```C
+```c
 #include "choice.h"
 #include <stdbool.h>
 
@@ -38,7 +38,7 @@ static struct {
 } config = {
   false,
   NULL,
-  0
+  -1
 };
 
 static option_t options[] = {
@@ -49,8 +49,34 @@ static option_t options[] = {
 
 int main( int argc, const char* argv[] ) {
   option_parse( options, argc, argv );
+  printf( "verbose: %s\n", config.verbose ? "true" : "false" );
+  printf( "required: %s\n", config.required );
+  printf( "optional: %li\n", config.optional );
   return 0;
 }
+```
+
+```console
+$ example
+verbose: false
+required: (null)
+optional: -1
+$ example --verbose --required=test
+verbose: true
+required: test
+optional: -1
+$ example -vrtest
+verbose: true
+required: test
+optional: -1
+$ example --vebrose --requird derp
+verbose: true
+required: derp
+optional: -1
+$ example --verb --opt
+verbose: true
+required: (null)
+optional: 0
 ```
 
 ## Credits
