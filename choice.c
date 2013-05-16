@@ -53,6 +53,7 @@ int option_log( option_t* option, const char* arg ) {
     printf( " -> \"%s\"\n", arg );
   else
     printf( "\n" );
+  return 0;
 }
 
 /**
@@ -158,7 +159,7 @@ int choice_exactcmp( const char* target, const char* str ) {
  *     ( "test", "teapot" ) -> -4
  */
 int choice_prefixcmp( const char* target, const char* str ) {
-  char t, s;
+  char t, s = '\0';
   int i;
   while( (t = *target) != '\0' && (s = *str) != '\0' && t == s ) {
     target++;
@@ -179,8 +180,8 @@ int choice_prefixcmp( const char* target, const char* str ) {
  * characters, substitution (3) and deletion (4) will have a
  * larger impact on the distance.
  *
- * If the computed distance is greater the the length
- * of the target, a negative number is returned.
+ * If the computed distance is greater than or equal to the
+ * length of the target, a negative number is returned.
  *
  *     ( "test", "test" ) -> 0
  *     ( "test", "tset" ) -> 2           // swap
@@ -193,8 +194,8 @@ int choice_fuzzycmp( const char* target, const char* str ) {
   int lent = strlen( target );
   int lens = strlen( str );
   int dist = levenshtein(str, lens, target, lent, 2, 3, 1, 4);
-  if( dist > lent )
-    return lent-dist;
+  if( dist >= lent )
+    return lent-dist-1;
   return dist;
 }
 
@@ -482,6 +483,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
 #undef S_NAME
 #undef S_DONE
 #undef ARG
+  return 0;
 }
 
 int subopt_parse( option_t* options, char* argv ) {
