@@ -11,11 +11,11 @@ fuzzy option matching and generating command completion.
 ### The developer's answer
 
 I can not recall how many ad-hoc option parsers I have written,
-so it's probably been a few too many.
+but it's probably been a few too many.
 You start with a simple loop, looking for the one single flag
-you app understands and it goes downhill from there. After a short
+you program understands and it goes downhill from there. After a short
 struggle, you end up sucking it up to `getopt` and its not quite
-portable cousing `getopt_long` and that is that.
+portable cousin `getopt_long` and that is that.
 
 ### The user's answer
 

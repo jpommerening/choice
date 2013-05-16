@@ -1,11 +1,11 @@
 #ifndef _CHOICE_H_
 #define _CHOICE_H_
 
-#define CHC_EINVAL 1  /* invalid option */
-#define CHC_ENOARG 2  /* option has no argument */
-#define CHC_EREQARG 3 /* option requres an argument */
-#define CHC_EONCE 4   /* option already seen */
-#define CHC_EAMBGS 5  /* option is ambigous */
+#define OPTION_EINVAL 1  /* invalid option */
+#define OPTION_ENOARG 2  /* option has no argument */
+#define OPTION_EREQARG 3 /* option requires an argument */
+#define OPTION_EONCE 4   /* option already seen */
+#define OPTION_EAMBIG 5  /* option is ambiguous */
 
 typedef enum {
   OPTION_REQARG = 1,
@@ -16,7 +16,6 @@ typedef enum {
 } option_flag_t;
 
 typedef struct option_s option_t;
-typedef struct command_s command_t;
 
 typedef int (*option_cb)( option_t* option, const char* arg );
 
@@ -29,18 +28,13 @@ struct option_s {
   void* data;
 };
 
-struct command_s {
-  option_t* options;
-  const char* name;
-  int argc;
-  char** argv;
-};
-
 extern int option_true( option_t* option, const char* arg );
 extern int option_false( option_t* option, const char* arg );
 extern int option_long( option_t* option, const char* arg );
 extern int option_str( option_t* option, const char* arg );
 extern int option_log( option_t* option, const char* arg );
+extern int option_help( option_t* option, const char* arg );
+extern int option_subopt( option_t* option, const char* arg );
 
 #define OPTION_TRUE(name, desc, abbr, bool_var) \
   { name, desc, abbr, 0, option_true, &bool_var }
@@ -50,6 +44,8 @@ extern int option_log( option_t* option, const char* arg );
   { name, desc, abbr, OPTION_REQARG, option_long, &long_var }
 #define OPTION_STR(name, desc, abbr, str_var) \
   { name, desc, abbr, OPTION_REQARG, option_str, &str_var }
+#define OPTION_SUBOPT(name, desc, abbr, opts) \
+  { name, desc, abbr, OPTION_REQARG, option_subopt, &(opts[0]) }
 #define OPTION_EOL \
   { NULL, NULL, '\0', 0, NULL, NULL }
 

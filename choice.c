@@ -1,38 +1,213 @@
 #include "choice.h"
+#include <limits.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <string.h>
 
-static int prefixcmp( const char* target, const char* prefix ) {
-  char t, p;
+/* MARK: option callbacks *//**
+ * @name option callbacks
+ * @{
+ */
+
+/** Store `true` in variable pointed to by `option->data` */
+int option_true( option_t* option, const char* arg ) {
+  if( option->data != NULL )
+    *((bool*) option->data) = true;
+  return 0;
+}
+
+/** Store `false` in variable pointed to by `option->data` */
+int option_false( option_t* option, const char* arg ) {
+  if( option->data != NULL )
+    *((bool*) option->data) = false;
+  return 0;
+}
+
+/** Store a `long` number in variable pointed to by `option->data` */
+int option_long( option_t* option, const char* arg ) {
+  if( option->data != NULL )
+    *((long*) option->data) = (arg == NULL) ? 0 : atol(arg);
+  return 0;
+}
+
+/** Store `arg` unmodified in variable pointed to by `option->data` */
+int option_str( option_t* option, const char* arg ) {
+  if( option->data != NULL )
+    *((const char**) option->data) = arg;
+  return 0;
+}
+
+/** Write a line to `stdout` */
+int option_log( option_t* option, const char* arg ) {
+  if( option->name != NULL && option->abbr != '\0' )
+    printf( " -%c, --%-10s", option->abbr, option->name );
+  else if( option->name != NULL )
+    printf( "     --%-10s", option->name );
+  else if( option->abbr != '\0' )
+    printf( " -%c, %12s", option->abbr, "" );
+
+  if( arg )
+    printf( " -> \"%s\"\n", arg );
+  else
+    printf( "\n" );
+}
+
+/**
+ * Print the given format and indent for the next columns,
+ * Print a new line plus the indent if the formatted string
+ * is longer than the desired indent.
+ */
+static void pindent( const char* fmt, ... ) {
+  char str[26];
+  int len;
+  va_list vargs, vargs2;
+  va_start(vargs, fmt);
+  va_copy(vargs2, vargs);
+  len = vsnprintf(&(str[0]), sizeof(str), fmt, vargs );
+
+  if( len >= sizeof(str)-1 ) {
+    printf( "  " );
+    vprintf( fmt, vargs2 );
+    printf( "\n  %-28s", "" );
+  } else {
+    printf( "  %-28s", str );
+  }
+  va_end(vargs);
+}
+
+/** Print the classic option help, that we've come to expect from UNIX programs */
+int option_help( option_t* option, const char* arg ) {
+  bool reqarg = option->flags & OPTION_REQARG;
+  bool optarg = option->flags & OPTION_OPTARG;
+  if( arg == NULL ) arg = "arg";
+
+  if( option->name != NULL && option->abbr != '\0' ) {
+    if( reqarg ) {
+      pindent( "-%c, --%s=<%s>", option->abbr, option->name, arg );
+    } else if( optarg ) {
+      pindent( "-%c, --%s [%s]", option->abbr, option->name, arg );
+    } else {
+      pindent( "-%c, --%s", option->abbr, option->name, arg );
+    }
+  } else if( option->name != NULL ) {
+    if( reqarg ) {
+      pindent( "    --%s=<%s>", option->name, arg );
+    } else if( optarg ) {
+      pindent( "    --%s [%s]", option->name, arg );
+    } else {
+      pindent( "    --%s", option->name );
+    }
+  } else if( option->abbr != '\0' ) {
+    if( reqarg ) {
+      pindent( "-%c <%s>", option->abbr, arg );
+    } else if( optarg ) {
+      pindent( "-%c [%s]", option->abbr, arg );
+    } else {
+      pindent( "-%c", option->abbr );
+    }
+  }
+
+  printf( "%s\n", option->desc );
+  return 0;
+}
+
+/**
+ * Parse the suboptions in the given `arg`.
+ * See `subopt_parse` for more info.
+ */
+int option_subopt( option_t* option, const char* arg ) {
+  char* str = (char*)arg; /* Trust me, it's going to be fine. */
+  return subopt_parse( option->data, str );
+}
+
+/** @} */
+
+/* MARK: comparators *//**
+ * @name comparators
+ * @{
+ */
+
+static int levenshtein( const char *string1, int len1, const char *string2, int len2,
+                        int w, int s, int a, int d );
+
+/**
+ * Check for exact match.
+ *
+ *     ( "test", "test" ) -> 0
+ *     ( "test", "tset" ) -> -1
+ *     ( "test", "test1" ) -> -1
+ *     ( "test", "tes" ) -> -1
+ */
+int choice_exactcmp( const char* target, const char* str ) {
+  return strcmp( target, str ) == 0 ? 0 : -1;
+}
+
+/**
+ * Check the common prefix of two strings.
+ * Return 0 if strings are strictly equal, positive if `str` is a prefix
+ * of `target`, negative otherwise.
+ *
+ *     ( "test", "test" ) -> 0
+ *     ( "test", "tset" ) -> -3
+ *     ( "test", "test1" ) -> -1
+ *     ( "test", "tes" ) -> 1
+ *     ( "test", "te" ) -> 2
+ *     ( "test", "teapot" ) -> -4
+ */
+int choice_prefixcmp( const char* target, const char* str ) {
+  char t, s;
   int i;
-  while( (t = *target) != '\0' && (p = *prefix) != '\0' && t == p ) {
+  while( (t = *target) != '\0' && (s = *str) != '\0' && t == s ) {
     target++;
-    prefix++;
+    str++;
   };
-  if( p == '\0' ) {
+  if( s == '\0' ) {
     for( i=0; *target++ != '\0'; i++ );
     return i;
   } else {
-    for( i=0; *prefix++ != '\0'; i-- );
+    for( i=0; *str++ != '\0'; i-- );
     return i;
   }
 }
 
-#include <string.h>
-#include <stdlib.h>
-static int levenshtein( const char *string1, const char *string2,
+/**
+ * Compare using the levenshtein algorithm.
+ * The algorithm weights favor addition (1) and swapping (2) of
+ * characters, substitution (3) and deletion (4) will have a
+ * larger impact on the distance.
+ *
+ * If the computed distance is greater the the length
+ * of the target, a negative number is returned.
+ *
+ *     ( "test", "test" ) -> 0
+ *     ( "test", "tset" ) -> 2           // swap
+ *     ( "test", "test1" ) -> 4          // del one
+ *     ( "test", "tes" ) -> 1            // add one
+ *     ( "test", "te" ) -> 2             // add two
+ *     ( "test", "teapot" ) -> -7 (4-11) // sub two, ..?
+ */
+int choice_fuzzycmp( const char* target, const char* str ) {
+  int lent = strlen( target );
+  int lens = strlen( str );
+  int dist = levenshtein(str, lens, target, lent, 2, 3, 1, 4);
+  if( dist > lent )
+    return lent-dist;
+  return dist;
+}
+
+static int levenshtein( const char *string1, int len1, const char *string2, int len2,
                         int w, int s, int a, int d ) {
-  int len1 = strlen(string1), len2 = strlen(string2);
-  int *row0 = calloc(sizeof(int), (len2 + 1));
-  int *row1 = calloc(sizeof(int), (len2 + 1));
-  int *row2 = calloc(sizeof(int), (len2 + 1));
+  int* row0 = calloc(sizeof(int), (len2 + 1));
+  int* row1 = calloc(sizeof(int), (len2 + 1));
+  int* row2 = calloc(sizeof(int), (len2 + 1));
   int i, j;
 
   for( j = 0; j <= len2; j++ ) row1[j] = j * a;
   for( i = 0; i < len1; i++ ) {
-    int *dummy;
+    int* dummy;
 
     row2[0] = (i + 1) * d;
     for( j = 0; j < len2; j++ ) {
@@ -62,40 +237,44 @@ static int levenshtein( const char *string1, const char *string2,
   free(row1);
   free(row2);
 
-  if( i > len2 )
-    return -1;
   return i;
 }
-static int fuzzycmp(const char* target, const char* str) {
-  if( *target != *str )
-    return -1;
-  return levenshtein(str, target, 2, 8, 1, 6);
-}
 
-#define FUZZY_MAX 10
+/** @} */
+
+/* MARK: option lookup *//**
+ * @name option lookup
+ * @{
+ */
+
+/**
+ * Lookup by name, disambiguate by result distance.
+ */
 static option_t* option_by_name( option_t* options, const char* str ) {
   option_t* option = NULL;
-  int val, max = FUZZY_MAX + 1;
+  int val, max = INT_MAX;
   while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->name == NULL ) {
-      options++;
-      continue;
-    }
-    val = fuzzycmp(options->name, str);
-    if( val >= 0 && val <= FUZZY_MAX ) {
-      if( val < max ) {
-        max = val;
-        option = options;
-      } else if( val == max ) {
-        /* ambiguous */
-        fprintf( stderr, "ambiguous option --%s, could be --%s, --%s\n", str, option->name, options->name );
-        return NULL;
+    if( options->name != NULL ) {
+      val = choice_fuzzycmp( options->name, str );
+      if( val >= 0 && val < INT_MAX ) {
+        if( val < max ) {
+          max = val;
+          option = options;
+        } else if( val == max ) {
+          /* ambiguous */
+          fprintf( stderr, "ambiguous option --%s, could be --%s, --%s\n", str, option->name, options->name );
+          return NULL;
+        }
       }
     }
     options++;
   }
   return option;
 }
+
+/**
+ * Lookup by abbreviation.
+ */
 static option_t* option_by_abbr( option_t* options, char c ) {
   while( options->name != NULL || options->abbr != '\0' ) {
     if( options->abbr != '\0' && options->abbr == c ) {
@@ -106,29 +285,82 @@ static option_t* option_by_abbr( option_t* options, char c ) {
   return NULL;
 }
 
+/** @} */
+
+typedef struct command_s command_t;
+
+struct command_s {
+  option_t* options;
+  const char* name;
+  int argc;
+  char** argv;
+};
+
+/* MARK: argv dissection *//**
+ * @name argv dissection
+ * @{
+ */
+
 #ifndef _GNU_SOURCE
+/**
+ * This is a neat function, too bad it's not available everywhere.
+ */
 static char* strchrnul( char* str, int c ) {
-  int s = *str;
-  while( s != c && s != '\0' ) s = *(++str);
+  int d = *str;
+  while( d != c && d != '\0' ) d = *(++str);
   return str;
 }
 #endif
 
+/**
+ * Shift one argument from the argv list.
+ */
 static char* arg_shiftstr( command_t* command ) {
   char* str = command->argv[0];
   command->argc -= 1;
   command->argv = &(command->argv[1]);
   return str;
 }
+
+/**
+ * Shift one character from the current argument.
+ */
 static char arg_shiftc( command_t* command ) {
   char c = command->argv[0][0];
   command->argv[0] += 1;
   return c;
 }
+
+/**
+ * Shift characters from the current argument until either
+ * the passed character or the end of the string is reached.
+ */
 static char* arg_shiftstrchr( command_t* command, char c ) {
   char* str = command->argv[0];
   command->argv[0] = strchrnul( str, c );
   return str;
+}
+
+/** @} */
+
+/* MARK: option parsing *//**
+ * @name option parsing
+ * @{
+ */
+
+static int option_callback( option_t* option, const char* arg ) {
+  if( arg != NULL && *arg == '\0' )
+    arg = NULL;
+
+  if( arg == NULL && (option->flags & OPTION_REQARG) )
+    return OPTION_EREQARG;
+  else if( arg != NULL && !(option->flags & OPTION_ARG) )
+    return OPTION_ENOARG;
+
+  if( option->callback )
+    return (option->callback)( option, arg );
+
+  return 0;
 }
 
 int option_parse( option_t* options, int argc, char* argv[] ) {
@@ -153,7 +385,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
       case S_ANY:
         if( ARG[0] == '-' ) {
           if( option ) {
-            (option->callback)( option, NULL );
+            option_callback( option, NULL );
             option = NULL;
           }
           if( ARG[1] == '-' ) {
@@ -167,13 +399,11 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
         }
       case S_ARG:
         if( option == NULL ) {
-          /* plain string option */
-          arg = arg_shiftstr( &command );
-          fprintf( stderr, "plain %s!\n", arg );
-          return;
+          /* TODO: keep looking */
+          state = S_DONE;
         } else {
           arg = arg_shiftstr( &command );
-          (option->callback)( option, arg );
+          option_callback( option, arg );
           option = NULL;
           state = S_ANY;
         }
@@ -189,19 +419,19 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option -%c!\n", abbr );
-            return;
+            return -1;
           }
           if( option->flags & OPTION_ARG ) {
             arg = arg_shiftstr( &command );
             if( arg[0] != '\0' ) {
-              (option->callback)( option, arg );
+              option_callback( option, arg );
               option = NULL;
               state = S_ANY;
             } else {
               state = (option->flags & OPTION_REQARG) ? S_ARG : S_ANY;
             }
           } else {
-            (option->callback)( option, NULL );
+            option_callback( option, NULL );
             option = NULL;
             state = S_ABBR;
           }
@@ -220,11 +450,11 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option --%s!\n", name );
-            return;
+            return -1;
           }
           if( option->flags & OPTION_ARG ) {
             if( arg[0] != '\0' ) {
-              (option->callback)( option, arg );
+              option_callback( option, arg );
               option = NULL;
               state = S_ANY;
             } else {
@@ -233,16 +463,16 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           } else if( arg[0] != '\0' ) {
             /* does not take args */
             fprintf( stderr, "option --%s does not take parameters (%s)!\n", option->name, arg );
-            return;
+            return -1;
           } else {
-            (option->callback)( option, NULL );
+            option_callback( option, NULL );
             option = NULL;
             state = S_ANY;
           }
         }
         break;
       case S_DONE:
-        return;
+        return 0;
     }
   }
 
@@ -270,7 +500,7 @@ int subopt_parse( option_t* options, char* argv ) {
     option = option_by_name( options, name );
     if( option == NULL ) {
       /* unknown option */
-      return;
+      return 1;
     }
     if( option->flags & OPTION_ARG ) {
       if( arg[0] != '\0' ) {
@@ -278,115 +508,48 @@ int subopt_parse( option_t* options, char* argv ) {
         option = NULL;
       } else {
         /* requires arg */
-        return ;
+        return 1;
       }
     } else if( arg[0] != '\0' ) {
       /* does not take args */
-      return;
+      return 1;
     } else {
       (option->callback)( option, NULL );
       option = NULL;
     }
   }
-
-}
-
-int option_true( option_t* option, const char* arg ) {
-  if( option->data == NULL ) return 0;
-  *((bool*) option->data) = true;
-}
-
-int option_false( option_t* option, const char* arg ) {
-  if( option->data == NULL ) return 0;
-  *((bool*) option->data) = false;
-}
-
-int option_long( option_t* option, const char* arg ) {
-  if( option->data == NULL ) return 0;
-  *((long*) option->data) = (arg == NULL) ? 0 : atol(arg);
-}
-
-int option_str( option_t* option, const char* arg ) {
-  if( option->data == NULL ) return 0;
-  *((const char**) option->data) = arg;
-}
-
-int option_log( option_t* option, const char* arg ) {
-  if( option->name != NULL && option->abbr != '\0' )
-    printf( " -%c, --%-10s", option->abbr, option->name );
-  else if( option->name != NULL )
-    printf( "     --%-10s", option->name );
-  else if( option->abbr != '\0' )
-    printf( " -%c, %12s", option->abbr, "" );
-
-  if( arg )
-    printf( " -> \"%s\"\n", arg );
-  else
-    printf( "\n" );
-}
-
-int option_subopt( option_t* option, const char* arg ) {
-  char * str = arg;
-  subopt_parse( option->data, str );
   return 0;
 }
 
-/*
-static option_t options[] = {
-  { "bool", "boolean option", 'b', 0, &option_log, NULL },
-  { "string", "string option", 's', OPTION_REQARG, &option_log, NULL },
-  { "strong", "strong option", '\0', OPTION_OPTARG, &option_log, NULL },
-  OPTION_EOL
-};
+/** @} */
 
-int main( int argc, char* argv[] ) {
-  printf( "name, name, %i (expect 0)\n",  prefixcmp( "name", "name" ) );
-  printf( "name, namee, %i (expect -1)\n", prefixcmp( "name", "namee" ) );
-  printf( "name, nam, %i (expect 1)\n",   prefixcmp( "name", "nam" ) );
-  printf( "name, namoo, %i (expect -2)\n",   prefixcmp( "name", "namoo" ) );
+#ifdef TESTS
+void distance_demo( int (*callback)( const char*, const char* ) ) {
+  int i;
+  struct {
+    const char* a;
+    const char* b;
+    int d;
+  } lev[] = {
+    { "test", "test", 0 },
+    { "test", "tset", 0 },
+    { "test", "test1", 0 },
+    { "test", "tes", 0 },
+    { "test", "te", 0 },
+    { "test", "teapot", 0 }
+  };
 
-  parse( options, argc, argv );
-  return 0;
+  for( i=0; i<(sizeof(lev)/sizeof(lev[0])); i++ ) {
+    lev[i].d = (callback)( lev[i].a, lev[i].b );
+    printf( "  ( \"%s\", \"%s\" ) -> %i\n", lev[i].a, lev[i].b, lev[i].d );
+  }
 }
-*/
-
-
-static struct {
-  bool verbose;
-  const char* required;
-  long optional;
-  bool write;
-  long bsize;
-} config = {
-  false,
-  NULL,
-  0,
-  true,
-  1024
-};
-
-static option_t subopts[] = {
-  { "rw", "aertgaert", '\0', 0, &option_true, &config.write },
-  { "ro", "aertgaert", '\0', 0, &option_false, &config.write },
-  { "bs", "aertgaert", '\0', OPTION_REQARG, &option_long, &config.bsize },
-  OPTION_EOL
-};
-
-static option_t options[] = {
-  { "verbose", "enable verbose stuff", 'v', 0, &option_true, &config.verbose },
-  { "required", "required arg", 'r', OPTION_REQARG, &option_str, &config.required },
-  { "optional", "optional arg", 'o', OPTION_OPTARG, &option_long, &config.optional },
-  { "subopt", "++++", 's', OPTION_REQARG, &option_subopt, &(subopts[0]) },
-  OPTION_EOL
-};
-
-int main( int argc, char* argv[] ) {
-  option_parse( options, argc, argv );
-  printf( "verbose: %s, required: %s, optional: %li, write: %s, bsize: %li\n",
-          config.verbose ? "true" : "false",
-          config.required,
-          config.optional,
-          config.write ? "true" : "false",
-          config.bsize );
-  return 0;
+void distance(void) {
+  printf( "\nexact:\n" );
+  distance_demo( &choice_exactcmp );
+  printf( "\nprefix:\n" );
+  distance_demo( &choice_prefixcmp );
+  printf( "\nfuzzy:\n" );
+  distance_demo( &choice_fuzzycmp );
 }
+#endif
