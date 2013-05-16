@@ -1,7 +1,51 @@
+/* -*- Mode: C; tab-width: 2; c-basic-offset: 2 -*- */
+/* vim:set softtabstop=2 shiftwidth=2: */
+/*
+ * choice -- the dyslexic option parser
+ *
+ * Latest source-code available at:
+ *    https://github.com/jpommerening/choice
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * Copyright (c) 2013, Jonas Pommerening <jonas.pommerening@gmail.com>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE  FOR  ANY  DIRECT,  INDIRECT,  INCIDENTAL,  SPECIAL,  EXEMPLARY,  OR
+ * CONSEQUENTIAL  DAMAGES  (INCLUDING,  BUT  NOT  LIMITED  TO,  PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES;  LOSS OF USE, DATA, OR PROFITS;  OR BUSINESS
+ * INTERRUPTION)  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * Todo-List:
+ *   [x] bells
+ *   [x] whistles
+ *   [ ] proper error handling (return codes, callbacks)
+ *   [ ] help-printing for subopts
+ *   [ ] completion support
+ *   [ ] keep looking after first "non-option"
+ *   [ ] refactor parser loop
+ */
 #include "choice.h"
 #include <limits.h>
 #include <stdlib.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -131,8 +175,9 @@ int option_subopt( option_t* option, const char* arg ) {
  * @{
  */
 
-static int levenshtein( const char *string1, int len1, const char *string2, int len2,
-                        int w, int s, int a, int d );
+static int levenshtein( const char *string1, size_t len1,
+                        const char *string2, size_t len2,
+                        int swp, int sub, int ins, int del );
 
 /**
  * Check for exact match.
@@ -199,46 +244,70 @@ int choice_fuzzycmp( const char* target, const char* str ) {
   return dist;
 }
 
-static int levenshtein( const char *string1, int len1, const char *string2, int len2,
-                        int w, int s, int a, int d ) {
-  int* row0 = calloc(sizeof(int), (len2 + 1));
-  int* row1 = calloc(sizeof(int), (len2 + 1));
-  int* row2 = calloc(sizeof(int), (len2 + 1));
-  int i, j;
+/**
+ * Damerau Levenshtein distance.
+ * Computes the number of "edits" that need to be made for
+ * `string1` to be the same as `string2`.
+ *
+ * Adapted & extended from https://github.com/schuyler/levenshtein.
+ * released by Schuyler Erle under the 2-term BSD license.
+ */
+static int levenshtein( const char* str1, size_t len1,
+                        const char* str2, size_t len2,
+                        int swp, int sub, int ins, int del ) {
+  int *vn, *v0, *v1, *v2, *tmp;
+  int i, j, next = 0;
 
-  for( j = 0; j <= len2; j++ ) row1[j] = j * a;
+  /* strip common prefixes */
+  while( len1 > 0 && len2 > 0 && str1[0] == str2[0] )
+    str1++, str2++, len1--, len2--;
+
+  /* handle degenerate cases */
+  if( !len1 ) return len2 * ins;
+  if( !len2 ) return len1 * del;
+
+  vn = calloc( (len2+1)*3, sizeof(int) );
+  v0 = &(vn[0]);
+  v1 = &(vn[len2+1]);
+  v2 = &(vn[(len2+1)*2]);
+
+  /* initialize the column vector */
+  for( j = 0; j <= len2; j++ )
+    v1[j] = j * ins;
   for( i = 0; i < len1; i++ ) {
-    int* dummy;
+    /* set the value of the first row (deletion) */
+    v2[0] = (i + 1) * del;
 
-    row2[0] = (i + 1) * d;
     for( j = 0; j < len2; j++ ) {
-      /* substitution */
-      row2[j + 1] = row1[j] + s * (string1[i] != string2[j]);
+      next = v1[j];
+
+      /* substitute */
+      if( str1[i] != str2[j] )
+        next = v1[j] + sub;
       /* swap */
-      if( i > 0 && j > 0 && string1[i - 1] == string2[j] &&
-          string1[i] == string2[j - 1] &&
-          row2[j + 1] > row0[j - 1] + w )
-        row2[j + 1] = row0[j - 1] + w;
-      /* deletion */
-      if( row2[j + 1] > row1[j + 1] + d )
-        row2[j + 1] = row1[j + 1] + d;
-      /* insertion */
-      if( row2[j + 1] > row2[j] + a )
-        row2[j + 1] = row2[j] + a;
+      if( i && (str1[i-1] == str2[j]) &&
+          j && (str1[i] == str2[j-1]) &&
+          next > v0[j-1] + swp )
+        next = v0[j-1] + swp;
+      /* delete */
+      if( next > v1[j+1] + del )
+        next = v1[j+1] + del;
+      /* insert */
+      if( next > v2[j] + ins )
+        next = v2[j] + ins;
+
+      v2[j+1] = next;
     }
 
-    dummy = row0;
-    row0 = row1;
-    row1 = row2;
-    row2 = dummy;
+    /* rotate v0 << v1 << v2 */
+    tmp = v0;
+    v0 = v1;
+    v1 = v2;
+    v2 = tmp;
   }
 
-  i = row1[len2];
-  free(row0);
-  free(row1);
-  free(row2);
-
-  return i;
+  free(vn);
+  return next;
 }
 
 /** @} */
@@ -546,7 +615,7 @@ void distance_demo( int (*callback)( const char*, const char* ) ) {
     printf( "  ( \"%s\", \"%s\" ) -> %i\n", lev[i].a, lev[i].b, lev[i].d );
   }
 }
-void distance(void) {
+int main(void) {
   printf( "\nexact:\n" );
   distance_demo( &choice_exactcmp );
   printf( "\nprefix:\n" );

@@ -1,5 +1,41 @@
-#ifndef _CHOICE_H_
-#define _CHOICE_H_
+/* -*- Mode: C; tab-width: 2; c-basic-offset: 2 -*- */
+/* vim:set softtabstop=2 shiftwidth=2: */
+/*
+ * choice -- the dyslexic option parser
+ * ====================================
+ *
+ * Copyright (c) 2013, Jonas Pommerening <jonas.pommerening@gmail.com>
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE  FOR  ANY  DIRECT,  INDIRECT,  INCIDENTAL,  SPECIAL,  EXEMPLARY,  OR
+ * CONSEQUENTIAL  DAMAGES  (INCLUDING,  BUT  NOT  LIMITED  TO,  PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES;  LOSS OF USE, DATA, OR PROFITS;  OR BUSINESS
+ * INTERRUPTION)  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+#ifndef __CHOICE_H
+#define __CHOICE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stddef.h>
 
 #define OPTION_EINVAL 1  /* invalid option */
 #define OPTION_ENOARG 2  /* option has no argument */
@@ -51,5 +87,9 @@ extern int option_subopt( option_t* option, const char* arg );
 
 extern int option_parse( option_t* options, int argc, char* argv[] );
 extern int subopt_parse( option_t* options, char *argv );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
