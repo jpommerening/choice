@@ -6,9 +6,27 @@
 Choice is a parser for command-line options with support for
 fuzzy option matching and generating command completion.
 
+It is just two files and not even a thousand NLOC with all the
+bells and whistles you can ask for.
+
 ## Why?
 
-### The developer's answer
+I spend most of my day in _xterm_ and OS X' _Terminal_. There's
+a lot of typing going on. There are so may awesome command-line utilities
+out there, but I wish there were more of them.
+
+As a heavy command-line user, I've grown pretty accustomed to the
+behaviour of `getopt`. The combination of long and short options works
+surprisingly well. I don't care _what_ parses the options.
+
+But when I write yet-another-utility-program, what I'm often struggling
+with is designing the command-line switches for a great experience.
+More often than not, I just want to get the job done, and couldn't
+care less about the usability.
+
+But usability matters. So to solve the problem once and for all, here
+is one more option parser. There's no excuse anymore for those crufty
+`while`-`switch` loops.
 
 I can not recall how many ad-hoc option parsers I have written,
 but it's probably been a few too many.
@@ -16,12 +34,6 @@ You start with a simple loop, looking for the one single flag
 you program understands and it goes downhill from there. After a short
 struggle, you end up sucking it up to `getopt` and its not quite
 portable cousin `getopt_long` and that is that.
-
-### The user's answer
-
-As a heavy command-line user, I've grown pretty accustomed to the
-behaviour of `getopt`. The combination of long and short options works
-surprisingly well. I don't really care _what_ parses the options.
 
 ## Examples
 
@@ -44,7 +56,8 @@ static struct {
 static option_t options[] = {
   { "verbose", "enable verbose stuff", 'v', 0, &choice_true, &config.verbose },
   { "required", "required arg", 'r', OPTION_REQARG, &choice_str, &config.required },
-  { "optional", "optional arg", 'o', OPTION_OPTARG, &choice_long, &config.optional }
+  { "optional", "optional arg", 'o', OPTION_OPTARG, &choice_long, &config.optional },
+  OPTION_EOL
 };
 
 int main( int argc, const char* argv[] ) {
