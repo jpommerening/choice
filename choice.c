@@ -28,7 +28,7 @@
  * CONSEQUENTIAL  DAMAGES  (INCLUDING,  BUT  NOT  LIMITED  TO,  PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES;  LOSS OF USE, DATA, OR PROFITS;  OR BUSINESS
  * INTERRUPTION)  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * CONTRACT,  STRICT LIABILITY,  OR TORT  (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
@@ -433,6 +433,28 @@ static int option_callback( option_t* option, const char* arg ) {
   return 0;
 }
 
+static int option_error( option_t* option, int errno, const char* arg ) {
+  switch( errno ) {
+    case OPTION_EINVAL:
+      fprintf( stderr, "unknown option: `--%s'\n", arg );
+      break;
+    case OPTION_ENOARG:
+      fprintf( stderr, "option --%s does not take any parameters (%s)\n",
+               option->name, arg );
+      break;
+    case OPTION_EREQARG:
+      fprintf( stderr, "option --%s requires a parameter\n", option->name );
+      break;
+    case OPTION_EONCE:
+      fprintf( stderr, "option --%s may only occur once\n", option->name );
+      break;
+    case OPTION_EAMBIG:
+      fprintf( stderr, "option --%s is ambiguous (maybe --%s)\n", arg, option->name );
+      break;
+  }
+  return errno;
+}
+
 int option_parse( option_t* options, int argc, char* argv[] ) {
   command_t command = { options, argv[0], argc - 1, &(argv[1]) };
   option_t* option = NULL;
@@ -489,7 +511,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option -%c!\n", abbr );
-            return -1;
+            return OPTION_EINVAL;
           }
           if( option->flags & OPTION_ARG ) {
             arg = arg_shiftstr( &command );
@@ -520,7 +542,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option --%s!\n", name );
-            return -1;
+            return OPTION_EINVAL;
           }
           if( option->flags & OPTION_ARG ) {
             if( arg[0] != '\0' ) {
@@ -533,7 +555,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           } else if( arg[0] != '\0' ) {
             /* does not take args */
             fprintf( stderr, "option --%s does not take parameters (%s)!\n", option->name, arg );
-            return -1;
+            return OPTION_ENOARG;
           } else {
             option_callback( option, NULL );
             option = NULL;
