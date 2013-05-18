@@ -1,37 +1,29 @@
-$(function() {
-  var input  = $( 'input[name="command"]' );
-  var prompt = $( 'form#prompt' );
-  var stdout = $( 'div#console' );
-  var code   = $( 'code.console' );
-
-  function repl() {
-    var value = input.val();
-    var argv  = value.split(' ');
-    var cmd   = argv.shift();
-    console.log( cmd, argv );
-    output = 'test\n';
-
-    prompt.before( '<samp class="prompt">choice.github.io $ </samp><kbd>' + value + '</kbd>\n' );
-    prompt.before( '<samp>' + output + '</samp>' );
-
-    input.val('');
-    input.focus();
-    stdout.scrollTop( code.height() );
-    return false;
+(function() {
+  var $terminal = $('#terminal').terminal();
+  window.T = $terminal.data('terminal');
+  function P(line) {
+    var argv = line.split(' ');
+    var name = argv.shift();
+    var Module = Choice(T);
+    Module.callMain(argv);
+    T.prompt(P);
   }
 
-  function typein(cmd) {
-    var c = 0;
-    var i = setInterval( function() {
-      var v = input.val();
-      input.val(v + cmd[c++]);
-      if( c >= cmd.length ) {
+  T.prompt(P);
+  T.$textarea.focus();
+
+  function typein(str) {
+    var i = setInterval(function() {
+      T.type(str[0]);
+      str = str.slice(1);
+      if( !str ) {
+        T.type(13);
         clearInterval(i);
       }
-    }, 110);
+    }, 90);
   }
 
-  prompt.submit(repl);
-  input.focus();
-  typein("choice ");
-});
+  typein('choice --help');
+}());
+
+

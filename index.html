@@ -30,21 +30,11 @@
         </header>
 
         <div class="jumbotron clearfix">
-          <div id="console">
-
-<code class="console"><samp class="prompt">choice.github.io $ </samp><kbd>choice --help</kbd>
-<samp>usage: choice [options]
-
-options:
-  -h, --help       display help</samp>
-
-<form id="prompt"><samp class="prompt">choice.github.io $ </samp><input name="command" class="console" type="text"></input></form>
-</code>
-        </div>
+          <div id="terminal" class="console"></div>
 
         <aside class="download">
-          <a class="btn large"><i class="icon-download"></i> Download <small>(v0.1.0)</small></a>
-          <a class="btn large"><i class="icon-github"></i> GitHub project</a>
+          <a class="btn large primary" href="https://github.com/jpommerening/choice/archive/v0.1.0.zip"><i class="icon-download"></i> Download <small>(v0.1.0)</small></a>
+          <a class="btn large" href="https://github.com/jpommerening/choice"><i class="icon-github"></i> GitHub project</a>
         </aside>
 
         </div>
@@ -59,9 +49,17 @@ options:
       </div>
 
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.9.1.min.js"><\/script>')</script>
+        <script> window.jQuery || document.write('<script src="js/vendor/jquery-1.9.1.min.js"><\/script>'); </script>
         <script src="js/plugins.js"></script>
         <script src="js/main.js"></script>
+        <script>
+Module = {
+  noInitialRun: true,
+  print: function(x) { T.println(x, 'stdout'); },
+  printErr: function(x) { T.println(x, 'stderr'); }
+};
+        </script>
+        <script src="js/example.js"></script>
 
         <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
         <script>

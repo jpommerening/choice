@@ -101,12 +101,17 @@ textarea {
   height: 400px;
 }
 
-#console {
+#terminal {
   float: left;
   width: 61%;
   margin: 0 0 50px 6%;
   height: 350px;
   overflow: hidden;
+}
+#terminal textarea {
+  width: 1em;
+  margin: 0;
+  padding: 0;
 }
 
 .console {
@@ -117,17 +122,14 @@ textarea {
   font-family: 'Lucida Console', 'Bitstream Vera Sans Mono', 'Courier New', Monaco, Courier, monospace;
   white-space: pre;
 }
-input.console {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  margin: auto;
-}
 
 .prompt {
   font-weight: bold;
   color: #efdf37;
+}
+
+.stderr {
+  color: #f70000;
 }
 
 article {
