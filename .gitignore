@@ -2,3 +2,6 @@
 *.o
 *.a
 example
+
+# leftovers from gh-pages
+build
