@@ -1,33 +1,7 @@
-/*
- * HTML5 Boilerplate
- *
- * What follows is the result of much research on cross-browser styling.
- * Credit left inline and big thanks to Nicolas Gallagher, Jonathan Neal,
- * Kroc Camen, and the H5BP dev community and team.
- */
-
-/* ==========================================================================
-   Base styles: opinionated defaults
-   ========================================================================== */
-
-html,
-button,
-input,
-select,
-textarea {
-    color: #222;
-}
-
 body {
     font-size: 1em;
     line-height: 1.4;
 }
-
-/*
- * Remove text-shadow in selection highlight: h5bp.com/i
- * These selection rule sets have to be separate.
- * Customize the background color to match your design.
- */
 
 ::-moz-selection {
     background: #b3d4fc;
@@ -39,10 +13,6 @@ body {
     text-shadow: none;
 }
 
-/*
- * A better looking default horizontal rule
- */
-
 hr {
     display: block;
     height: 1px;
@@ -52,17 +22,9 @@ hr {
     padding: 0;
 }
 
-/*
- * Remove the gap between images and the bottom of their containers: h5bp.com/i/440
- */
-
 img {
     vertical-align: middle;
 }
-
-/*
- * Remove default fieldset styles.
- */
 
 fieldset {
     border: 0;
@@ -70,17 +32,9 @@ fieldset {
     padding: 0;
 }
 
-/*
- * Allow only vertical resizing of textareas.
- */
-
 textarea {
     resize: vertical;
 }
-
-/* ==========================================================================
-   Chrome Frame prompt
-   ========================================================================== */
 
 .chromeframe {
     margin: 0.2em 0;
@@ -89,16 +43,24 @@ textarea {
     padding: 0.2em 0;
 }
 
-/* ==========================================================================
-   Author's custom styles
-   ========================================================================== */
-
 .jumbotron {
   background-color: #3f3f37;
   box-shadow: 0  3px  5px rgba(0, 0, 0, 0.2) inset,
               0 -3px -5px rgba(0, 0, 0, 0.2) inset;
   position: relative:
   height: 400px;
+}
+
+@keyframes pulse {
+  0% { background-color: #f7f7f7; }
+  70% { background-color: #3f3f37; }
+  100% { background-color: #f7f7f7; }
+}
+
+@-webkit-keyframes pulse {
+  0% { background-color: #f7f7f7; }
+  70% { background-color: #3f3f37; }
+  100% { background-color: #f7f7f7; }
 }
 
 #terminal {
@@ -112,6 +74,18 @@ textarea {
   width: 1em;
   margin: 0;
   padding: 0;
+}
+.pulse {
+  animation: pulse 2s infinite;
+  -webkit-animation: pulse 2s infinite;
+}
+.cursor {
+  color: #f7f7f7;
+  box-shadow: 1px 1px 2px #9f9f8f;
+  border: 1px solid #f7f7f7;
+  overflow: hidden;
+  width: 1ex;
+  height: 1em;
 }
 
 .console {
@@ -158,7 +132,18 @@ aside {
 }
 
 
-
+.panel {
+  height: 400px;
+}
+.blue {
+  background-color: #464d70;
+}
+.gray {
+  background-color: #757575;
+}
+.green {
+  background-color: #a1ac88;
+}
 
 /* ==========================================================================
    Helper classes
