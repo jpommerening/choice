@@ -127,6 +127,7 @@ textarea {
   color: rgba(247, 247, 247, 1.0);
   box-shadow: 1px 1px 2px #8f979f;
   border: 1px solid rgba(247, 247, 247, 0.9);
+  margin: -1px;
   overflow: hidden;
   width: 1ex;
   height: 1em;
@@ -161,6 +162,7 @@ aside {
   background-color: #464d70;
 }
 
+/*
 .btn.large {
   font-size: 18px;
   font-weight: bold;
@@ -175,6 +177,7 @@ aside {
   color: #FFFFFF;
   text-decoration: none;
 }
+  */
 
 
 /* ==========================================================================

@@ -88,6 +88,11 @@
       entry = history.length - 1;
     }
 
+  var escElem = $('<div/>');
+  function escapeHtml(str) {
+    return escElem.text(str).html();
+  }
+
   Terminal.prototype = {
     
     constructor: Terminal
@@ -110,7 +115,7 @@
       if (output) {
         var samp = $('<samp' + (cls?' class="'+cls+'"':'') + '></samp>').text(output);
         this.$cursor.before(samp);
-        if( this.$kbdinput.text() ) this.$kbdinput = $('<kbd></kbd>');
+        if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
         this.$cursor.before(this.$kbdinput);
       }
     }
@@ -121,7 +126,7 @@
         this.$cursor.before(samp);
       }
       this.$cursor.before('<br/>');
-      if( this.$kbdinput.text() ) this.$kbdinput = $('<kbd></kbd>');
+      if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
       this.$cursor.before(this.$kbdinput);
     }
 
@@ -134,23 +139,54 @@
       this.callback = callback;
     }
 
+  , kbd: function() {
+      if (this.cursor >= this.buffer.length) {
+        this.$cursor.text(" ");
+        this.$kbdinput.text(this.buffer);
+        this.$kbdinput.after(this.$cursor);
+      } else {
+        var pre = this.buffer.substr(0, this.cursor);
+        var cur = this.buffer[this.cursor];
+        var post = this.buffer.substr(this.cursor+1);
+
+        this.$cursor.text(cur);
+        this.$kbdinput.text(pre);
+        this.$kbdinput.append(this.$cursor);
+        this.$kbdinput.append(escapeHtml(post));
+      }
+    }
+
   , type: function(str) {
       if (typeof str === 'number') {
         switch (str) {
-          case 33:
+          case 33: // pg up
             this.buffer = history_search_backward(this.buffer) || '';
             break;
-          case 34:
+          case 34: // pg down
             this.buffer = history_search_forward(this.buffer.substr(0, this.cursor)) || '';
             break;
-          case 38:
+          case 35: // end
+            this.cursor = this.buffer.length;
+            break;
+          case 36: // home
+            this.cursor = 0;
+            break;
+          case 37: // left
+            if (this.cursor > 0) this.cursor -= 1;
+            break;
+          case 38: // up
             this.buffer = history_previous();
             break;
-          case 40:
+          case 39: // right
+            if (this.cursor < this.buffer.length) this.cursor += 1;
+            break;
+          case 40: // down
             this.buffer = history_next();
             break;
           case 13:
           case 10:
+            this.cursor = this.buffer.length;
+            this.kbd();
             this.println();
             push( this.buffer );
             this.callback( this.buffer );
@@ -158,14 +194,21 @@
             this.buffer = '';
             return;
           case 8:
-            this.buffer = this.buffer.slice(0,-1);
+            var tmp = this.buffer;
+            if (this.cursor > 0) {
+              this.buffer = ( tmp.substr(0, this.cursor-1)
+                            + tmp.substr(this.cursor, tmp.length) );
+              this.cursor -= 1;
+            }
             break;
         }
-        this.$kbdinput.text(this.buffer);
+        this.kbd();
       } else {
-        this.cursor += 1;
-        this.buffer += str;
-        this.$kbdinput.text(this.buffer);
+        var tmp = this.buffer;
+        this.buffer = ( tmp.substr(0, this.cursor) + str
+                      + tmp.substr(this.cursor, tmp.length) );
+        this.cursor += str.length;
+        this.kbd();
       }
     }
 
