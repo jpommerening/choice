@@ -36,6 +36,49 @@ textarea {
     resize: vertical;
 }
 
+
+.panel {
+  height: 400px;
+}
+
+/**
+ * Palette a
+.blue {
+  background-color: #464d70;
+}
+.gray {
+  background-color: #757575;
+}
+.green {
+  background-color: #a1ac88;
+}
+ */
+
+/**
+ * Palette b
+ */
+.medium-gray {
+  background-color: #b3b7b9 !important; /* rgb(179, 183, 185) */
+}
+.dark-gray {
+  background-color: #53595e !important; /* rgb(83, 80, 94) */
+}
+.beige {
+  background-color: #d4d3c3 !important; /* rgb(212, 211, 195) */
+}
+.off-white {
+  background-color: #f8f4e8 !important; /* rgb(248, 244, 232) */
+}
+.slate {
+  background-color: #181a1d !important; /* rgb(24, 26, 29) */
+}
+.mint {
+  background-color: #a4c9c6 !important; /* rgb(164, 201, 198) */
+}
+.pine {
+  background-color: #c4c98a !important; /* rgb(196, 201, 138) */
+}
+
 .chromeframe {
     margin: 0.2em 0;
     background: #ccc;
@@ -44,7 +87,7 @@ textarea {
 }
 
 .jumbotron {
-  background-color: #3f3f37;
+  background-color: #757575;
   box-shadow: 0  3px  5px rgba(0, 0, 0, 0.2) inset,
               0 -3px -5px rgba(0, 0, 0, 0.2) inset;
   position: relative:
@@ -52,15 +95,15 @@ textarea {
 }
 
 @keyframes pulse {
-  0% { background-color: #f7f7f7; }
-  70% { background-color: #3f3f37; }
-  100% { background-color: #f7f7f7; }
+  0% { background-color: rgba(247, 247, 247, 0.9); }
+  90% { background-color: rgba(247, 247, 247, 0.2); }
+  100% { background-color: rgba(247, 247, 247, 0.9); }
 }
 
 @-webkit-keyframes pulse {
-  0% { background-color: #f7f7f7; }
-  70% { background-color: #3f3f37; }
-  100% { background-color: #f7f7f7; }
+  0% { background-color: rgba(247, 247, 247, 0.9); }
+  90% { background-color: rgba(247, 247, 247, 0.2); }
+  100% { background-color: rgba(247, 247, 247, 0.9); }
 }
 
 #terminal {
@@ -76,13 +119,14 @@ textarea {
   padding: 0;
 }
 .pulse {
-  animation: pulse 2s infinite;
-  -webkit-animation: pulse 2s infinite;
+  animation: pulse 1.6s infinite;
+  -webkit-animation: pulse 1.6s infinite;
 }
 .cursor {
-  color: #f7f7f7;
-  box-shadow: 1px 1px 2px #9f9f8f;
-  border: 1px solid #f7f7f7;
+  background-color: rgba(247, 247, 247, 0.2);
+  color: rgba(247, 247, 247, 1.0);
+  box-shadow: 1px 1px 2px #8f979f;
+  border: 1px solid rgba(247, 247, 247, 0.9);
   overflow: hidden;
   width: 1ex;
   height: 1em;
@@ -91,7 +135,7 @@ textarea {
 .console {
   color: #f7f7f7;
   line-height: 1.6em;
-  text-shadow: 1px 1px 2px #9f9f8f;
+  text-shadow: 1px 1px 2px #8f979f;
   font-size: 14px;
   font-family: 'Lucida Console', 'Bitstream Vera Sans Mono', 'Courier New', Monaco, Courier, monospace;
   white-space: pre;
@@ -114,13 +158,14 @@ aside {
   float: right;
   margin: 20px 6% 0 0;
   width: 27%;
-  background-color: #efdf37;
+  background-color: #464d70;
 }
 
 .btn {
   border-radius: 4px;
-  background-color: #f3d737;
-  border: 2px solid #dfcf27;
+  background-color: #464d70;
+  border: 2px solid #363d60;
+  color: #fff;
 }
 
 .btn.large {
@@ -132,18 +177,6 @@ aside {
 }
 
 
-.panel {
-  height: 400px;
-}
-.blue {
-  background-color: #464d70;
-}
-.gray {
-  background-color: #757575;
-}
-.green {
-  background-color: #a1ac88;
-}
 
 /* ==========================================================================
    Helper classes
