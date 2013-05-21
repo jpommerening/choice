@@ -80,10 +80,10 @@ textarea {
 }
 
 .chromeframe {
-    margin: 0.2em 0;
-    background: #ccc;
-    color: #000;
-    padding: 0.2em 0;
+  margin: 0.2em 0;
+  background: #ccc;
+  color: #000;
+  padding: 0.2em 0;
 }
 
 .jumbotron {
@@ -161,21 +161,20 @@ aside {
   background-color: #464d70;
 }
 
-.btn {
-  border-radius: 4px;
-  background-color: #464d70;
-  border: 2px solid #363d60;
-  color: #fff;
-}
-
 .btn.large {
   font-size: 18px;
-  height: 24px;
-  min-width: 100px;
   font-weight: bold;
-  padding: 8px 25px;
+  height: 24px;
+  line-height: 3em;
+  padding: 0.5em 2ex;
 }
-
+.btn {
+  background-color: #464D70;
+  border: 2px solid #363D60;
+  border-radius: 4px 4px 4px 4px;
+  color: #FFFFFF;
+  text-decoration: none;
+}
 
 
 /* ==========================================================================
