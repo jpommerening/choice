@@ -25,10 +25,8 @@
 (function ($) {
   function Terminal(element, options) {
     this.options = options;
-    this.history = [];
-    this.buffer = '';
-    this.cursor = 0;
     this.callback = function() {};
+    this.readline = new Readline();
 
     var $cursor = $('<span class="cursor">&nbsp;</span>');
     var $textarea = $('<textarea rows="1" cols="1" style="opacity: 0;"></textarea>');
@@ -53,40 +51,142 @@
     this.$element.on('focus', function() { $textarea.focus(); });
   }
 
-    var history = [];
-    var maxlen = 50;
-    var entry = -1;
+  function Readline() {
+    this.cursor = 0; /* character offset in current line */
+    this.line = 0; /* currently selected history line */
+    this.top = 0; /* current top of history */
+    this.previous = ''; /* backup for history line */
+    this.history = ['']; /* history */
+    this.overwrite = false; /* overwrite/insert mode */
+  }
 
-    function history_next() {
-      if (entry >= history.length) return undefined;
-      return history[entry++];
+  Readline.prototype = {
+    constructor: Readline
+  , jump: function(line) {
+      if (line >= 0 && line <= this.top) {
+        if (line != this.top)
+          this.history[this.line] = this.previous;
+        this.line = line;
+        this.previous = this.history[line];
+      }
     }
-
-    function history_previous() {
-      if (entry < 0) return undefined;
-      return history[entry--];
+  , text: function() {
+      return this.history[this.line];
     }
-
-    function history_search_forward(str) {
-      for (; entry < history.length; entry++)
-        if (history[entry].substr(0, str.length) == str)
-          return history[entry];
-      return str;
+  /* Moving:
+   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-Moving.html */
+  , 'beginning-of-line': function() {
+      this.cursor = 0;
     }
-
-    function history_search_backward(str) {
-      for (; entry >= 0; entry--)
-        if (history[entry].substr(0, str.length) == str)
-          return history[entry];
-      return str;
+  , 'end-of-line': function() {
+      this.cursor = this.history[this.line].length;
     }
-
-    function push(str) {
-      history.push(str);
-      if (history.length > maxlen)
-        history = history.splice(1);
-      entry = history.length - 1;
+  , 'forward-char': function() {
+      if (this.cursor < this.history[this.line].length) this.cursor += 1;
     }
+  , 'backward-char': function() {
+      if (this.cursor > 0) this.cursor -= 1;
+    }
+  , 'forward-word': function() {
+      var offset = this.history[this.line].indexOf(' ', this.cursor);
+      if (offset < 0) {
+        this['end-of-line']();
+      } else {
+        this.cursor = offset;
+      }
+    }
+  , 'backward-word': function() {
+      var offset = this.history[this.line].lastIndexOf(' ', this.cursor);
+      if (offset < 0) {
+        this['beginning-of-line']();
+      } else {
+        this.cursor = offset;
+      }
+    }
+  /* History:
+   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-History.html */
+  , 'accept-line': function() {
+      if (this.history[this.line]) {
+        if (this.top != this.line) {
+          this.history[this.top] = this.history[this.line];
+          this.history[this.line] = this.previous;
+        }
+        this.history.push('');
+        this.previous = '';
+        this.cursor = 0;
+        this.line = this.top = this.history.length - 1;
+      }
+    }
+  , 'previous-history': function() {
+      this.jump(this.line-1);
+    }
+  , 'next-history': function() {
+      this.jump(this.line+1);
+    }
+  , 'beginning-of-history': function() {
+      this.jump(0);
+    }
+  , 'end-of-history': function() {
+      this.jump(this.top);
+    }
+  , 'reverse-search-history': function() {
+    }
+  , 'forward-search-history': function() {
+    }
+  , 'history-search-forward': function() {
+      var prefix = this.text().substr(0, this.cursor);
+      var line = this.line;
+      while (++line < this.top) {
+        if (this.history[line].substr(0, prefix.length) === prefix) {
+          this.line = line;
+          return;
+        }
+      }
+    }
+  , 'history-search-backward': function() {
+      var prefix = this.text().substr(0, this.cursor);
+      var line = this.line;
+      while (--line >= 0) {
+        if (this.history[line].substr(0, prefix.length) === prefix) {
+          this.line = line;
+          return;
+        }
+      }
+    }
+  /* Changing Text
+   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-Text.html */
+  , 'delete-char': function() {
+      var text = this.history[this.line];
+      var cursor = this.cursor;
+      this.history[this.line] = ( text.substr(0, cursor) + text.substr(cursor+1) );
+    }
+  , 'backward-delete-char': function(num) {
+      var text = this.history[this.line];
+      var cursor = this.cursor;
+      if (typeof num === 'undefined') num = 1;
+      if (cursor < num) num = cursor;
+      this.history[this.line] = ( text.substr(0, cursor-num) + text.substr(cursor) );
+      this.cursor -= num;
+  }
+  , 'forward-backward-delete-char': function() {
+      var text = this.history[this.line];
+      var cursor = this.cursor;
+      if (cursor >= text.length)
+        this['backward-delete-char']();
+      else
+        this['delete-char']();
+    }
+  , 'self-insert': function(str) {
+      var text = this.history[this.line];
+      var cursor = this.cursor;
+      var overwrite = this.overwrite ? str.length : 0;
+      this.history[this.line] = ( text.substr(0, cursor) + str + text.substr(cursor+overwrite) );
+      this.cursor += str.length - overwrite;
+    }
+  , 'overwrite-mode': function(mode) {
+      this.overwrite = (mode === undefined) ? !(this.overwrite) : !!(mode);
+    }
+  };
 
   var escElem = $('<div/>');
   function escapeHtml(str) {
@@ -106,6 +206,24 @@
     }
 
   , commands: {
+          /* backspace */
+       8: 'backward-delete-char'
+          /* page up */
+    , 33: 'history-search-backward'
+          /* page down */
+    , 34: 'history-search-forward'
+          /* end */
+    , 35: 'end-of-line'
+          /* home */
+    , 36: 'beginning-of-line'
+          /* left */
+    , 37: 'backward-char'
+          /* up */
+    , 38: 'previous-history'
+          /* right */
+    , 39: 'forward-char'
+          /* down */
+    , 40: 'next-history'
     }
 
   , colors: {
@@ -140,14 +258,16 @@
     }
 
   , kbd: function() {
-      if (this.cursor >= this.buffer.length) {
+      var cursor = this.readline.cursor;
+      var buffer = this.readline.text();
+      if (cursor >= buffer.length) {
         this.$cursor.text(" ");
-        this.$kbdinput.text(this.buffer);
+        this.$kbdinput.text(buffer);
         this.$kbdinput.after(this.$cursor);
       } else {
-        var pre = this.buffer.substr(0, this.cursor);
-        var cur = this.buffer[this.cursor];
-        var post = this.buffer.substr(this.cursor+1);
+        var pre = buffer.substr(0, cursor);
+        var cur = buffer[cursor];
+        var post = buffer.substr(cursor+1);
 
         this.$cursor.text(cur);
         this.$kbdinput.text(pre);
@@ -158,64 +278,30 @@
 
   , type: function(str) {
       if (typeof str === 'number') {
-        switch (str) {
-          case 33: // pg up
-            this.buffer = history_search_backward(this.buffer) || '';
-            break;
-          case 34: // pg down
-            this.buffer = history_search_forward(this.buffer.substr(0, this.cursor)) || '';
-            break;
-          case 35: // end
-            this.cursor = this.buffer.length;
-            break;
-          case 36: // home
-            this.cursor = 0;
-            break;
-          case 37: // left
-            if (this.cursor > 0) this.cursor -= 1;
-            break;
-          case 38: // up
-            this.buffer = history_previous();
-            break;
-          case 39: // right
-            if (this.cursor < this.buffer.length) this.cursor += 1;
-            break;
-          case 40: // down
-            this.buffer = history_next();
-            break;
+        switch(str) {
           case 13:
           case 10:
-            this.cursor = this.buffer.length;
+            this.readline['end-of-line']();
+            var text = this.readline.text();
             this.kbd();
+            this.readline['accept-line']();
             this.println();
-            push( this.buffer );
-            this.callback( this.buffer );
-            this.cursor = 0;
-            this.buffer = '';
+            this.callback( text );
             return;
-          case 8:
-            var tmp = this.buffer;
-            if (this.cursor > 0) {
-              this.buffer = ( tmp.substr(0, this.cursor-1)
-                            + tmp.substr(this.cursor, tmp.length) );
-              this.cursor -= 1;
-            }
-            break;
         }
         this.kbd();
       } else {
-        var tmp = this.buffer;
-        this.buffer = ( tmp.substr(0, this.cursor) + str
-                      + tmp.substr(this.cursor, tmp.length) );
-        this.cursor += str.length;
+        this.readline['self-insert'](str);
         this.kbd();
       }
     }
 
   , keydown: function(event) {
-      console.log(history, entry, event.which);
-      this.type(event.which);
-      return 0;
+      if (this.commands.hasOwnProperty(event.which))
+        this.readline[this.commands[event.which]]();
+      else
+        this.type(event.which);
+      this.kbd();
     }
 
   , keypress: function(event) {
