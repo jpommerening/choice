@@ -23,7 +23,7 @@
     }, 90);
   }
 
-  typein('choice --help');
+  typein('choice --halp');
 }());
 
 
