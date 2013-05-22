@@ -64,7 +64,7 @@
     constructor: Readline
   , jump: function(line) {
       if (line >= 0 && line <= this.top) {
-        if (line != this.top)
+        if (this.line != this.top)
           this.history[this.line] = this.previous;
         this.line = line;
         this.previous = this.history[line];
@@ -119,15 +119,19 @@
     }
   , 'previous-history': function() {
       this.jump(this.line-1);
+      this['end-of-line']();
     }
   , 'next-history': function() {
       this.jump(this.line+1);
+      this['end-of-line']();
     }
   , 'beginning-of-history': function() {
       this.jump(0);
+      this['end-of-line']();
     }
   , 'end-of-history': function() {
       this.jump(this.top);
+      this['end-of-line']();
     }
   , 'reverse-search-history': function() {
     }
@@ -181,7 +185,7 @@
       var cursor = this.cursor;
       var overwrite = this.overwrite ? str.length : 0;
       this.history[this.line] = ( text.substr(0, cursor) + str + text.substr(cursor+overwrite) );
-      this.cursor += str.length - overwrite;
+      this.cursor += str.length;
     }
   , 'overwrite-mode': function(mode) {
       this.overwrite = (mode === undefined) ? !(this.overwrite) : !!(mode);
@@ -263,7 +267,7 @@
       if (cursor >= buffer.length) {
         this.$cursor.text(" ");
         this.$kbdinput.text(buffer);
-        this.$kbdinput.after(this.$cursor);
+        this.$kbdinput.append(this.$cursor);
       } else {
         var pre = buffer.substr(0, cursor);
         var cur = buffer[cursor];

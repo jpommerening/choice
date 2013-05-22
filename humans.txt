@@ -10,4 +10,4 @@
 
     HTML5, CSS3
     Normalize.css, jQuery, Modernizr
-    Emscripten
+    Emscripten, FontAwesome

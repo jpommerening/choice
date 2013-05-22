@@ -32,33 +32,79 @@
 
         <div class="jumbotron clearfix">
           <div id="terminal" class="console"></div>
-
-        <aside class="download">
-          <a class="btn large primary" href="https://github.com/jpommerening/choice/archive/v0.1.0.zip"><i class="icon-download"></i> Download <small>(v0.1.0)</small></a>
-          <a class="btn large" href="https://github.com/jpommerening/choice"><i class="icon-github"></i> GitHub project</a>
-        </aside>
-
         </div>
 
-        <article class="wrapper">
-        <h2>This is it</h2>
+        <article class="clearfix">
         <section>
-        <p>blabla</p>
+        <h2>What is this?</h2>
+
+        Choice is a ..
         </section>
-        <section>
-        <p>blabla</p>
+        </article>
+
+        <hr/>
+
+        <article class="clearfix">
+        <section class="slim">
+        <h2 class="action">
+          <i class="icon-cloud-download"></i> Download
+        </h2>
+        <p>Choice is not really a library. Instead there is just two files to drop into your source code.</p>
+        <ul class="unstyled">
+          <li><a title="choice-master.tgz" class="btn btn-primary"
+            href="https://github.com/jpommerening/choice/archive/master.tgz">Download <small>(master)</small></a></li>
+          <li><a title="choice-master.tgz" class="btn"
+            href="https://github.com/jpommerening/choice/archive/v0.1.0.tgz">Download <small>(v0.1.0)</small></a></li>
+        </ul>
         </section>
+
+        <section class="slim">
+        <h2 class="action">
+          <i class="icon-beaker"></i> Experiment
+        </h2>
+        <p>Don't know if this is what you're looking for?</p>
+        <p>Have a look at the API and some example code!</p>
+        <ul class="icons-ul">
+          <li><a href="examples.html"><i class="icon-li icon-terminal"></i> Try the example programs</a></li>
+          <li><a href="docs.html"><i class="icon-li icon-book"></i> Read the docs</a></li>
+        </ul>
+        </section>
+
+        <section class="slim">
+        <h2 class="action">
+          <i class="icon-comments-alt"></i> Participate
+        </h2>
+        <p>Want to help? Missing a feature? Having a hard time using it?</p>
+        <p>Check out the links below!</p>
+        <ul class="icons-ul">
+          <li><a href="https://github.com/jpommerening/choice"><i class="icon-li icon-github"></i> Have a look</a></li>
+          <li><a href="https://github.com/jpommerening/choice/issues/new"><i class="icon-li icon-exclamation-sign"></i> File a bug</a></li>
+          <li><a href="https://github.com/jpommerening/choice/fork"><i class="icon-li icon-code-fork"></i> Fork the source</a></li>
+        </ul>
+        </section>
+
+        </article>
+
+        <footer class="fineprint">
+        <ul class="inline">
+          <li>Choice 0.1.0</li>
+          <li>Created and Maintained by Jonas Pommerening</li>
+          <li>@svckr</li>
+        </ul>
+        <ul class="inline">
+          <li>Choice is licensed under the (2-Clause) <a href="http://opensource.org/licenses/BSD-2-Clause" title="OSI - The BSD 2-Clause License">BSD License</a></li>
+          <li>Documentation is licensed under <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons - Attribution 3.0">CC BY 3.0</a></li>
+        </ul>
+        <ul class="inline">
+          <li>Examples translated to JavaScript with <a href="https://github.com/kripken/emscripten" title="GitHub - kripken/emscripten">emscripten</a></li>
+          <li>Terminal Emulator jQuery-Plugin <a href="https://github.com/jpommerening/jquery-terminal" title="GitHub - jpommerening/jquery-terminal">available here</a> <small>(coming soon)</small></li>
+        </ul>
+        </footer>
+
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
         <script> window.jQuery || document.write('<script src="js/vendor/jquery-1.9.1.min.js"><\/script>'); </script>
         <script src="js/plugins.js"></script>
         <script src="js/main.js"></script>
-        <script>
-Module = {
-  noInitialRun: true,
-  print: function(x) { T.println(x, 'stdout'); },
-  printErr: function(x) { T.println(x, 'stderr'); }
-};
-        </script>
         <script src="js/example.js"></script>
 
         <!-- Google Analytics: change UA-XXXXX-X to be your site's ID. -->
