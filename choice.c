@@ -86,7 +86,9 @@ int option_str( option_t* option, const char* arg ) {
 
 /** Write a line to `stdout` */
 int option_log( option_t* option, const char* arg ) {
-  if( option->name != NULL && option->abbr != '\0' )
+  if( option->flags & OPTION_NODASH )
+    printf( " %-14s", option->name );
+  else if( option->name != NULL && option->abbr != '\0' )
     printf( " -%c, --%-10s", option->abbr, option->name );
   else if( option->name != NULL )
     printf( "     --%-10s", option->name );
@@ -125,25 +127,27 @@ static void pindent( const char* fmt, ... ) {
 
 /** Print the classic option help, that we've come to expect from UNIX programs */
 int option_help( option_t* option, const char* arg ) {
+  bool nodash = option->flags & OPTION_NODASH;
   bool reqarg = option->flags & OPTION_REQARG;
   bool optarg = option->flags & OPTION_OPTARG;
+  const char* dash = nodash ? "" : "--";
   if( arg == NULL ) arg = "arg";
 
   if( option->name != NULL && option->abbr != '\0' ) {
     if( reqarg ) {
-      pindent( "-%c, --%s=<%s>", option->abbr, option->name, arg );
+      pindent( "-%c, %s%s=<%s>", option->abbr, dash, option->name, arg );
     } else if( optarg ) {
-      pindent( "-%c, --%s [%s]", option->abbr, option->name, arg );
+      pindent( "-%c, %s%s [%s]", option->abbr, dash, option->name, arg );
     } else {
-      pindent( "-%c, --%s", option->abbr, option->name, arg );
+      pindent( "-%c, %s%s", option->abbr, dash, option->name, arg );
     }
   } else if( option->name != NULL ) {
     if( reqarg ) {
-      pindent( "    --%s=<%s>", option->name, arg );
+      pindent( "    %s%s=<%s>", dash, option->name, arg );
     } else if( optarg ) {
-      pindent( "    --%s [%s]", option->name, arg );
+      pindent( "    %s%s [%s]", dash, option->name, arg );
     } else {
-      pindent( "    --%s", option->name );
+      pindent( "    %s%s", dash, option->name );
     }
   } else if( option->abbr != '\0' ) {
     if( reqarg ) {
@@ -319,12 +323,14 @@ static int levenshtein( const char* str1, size_t len1,
 
 /**
  * Lookup by name, disambiguate by result distance.
+ * Additionally, filter by the given flags. All given flags need to be set.
+ * No flags - no filtering.
  */
-static option_t* option_by_name( option_t* options, const char* str ) {
+static option_t* option_by_name( option_t* options, int flags, const char* str ) {
   option_t* option = NULL;
   int val, max = INT_MAX;
   while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->name != NULL ) {
+    if( options->name != NULL && ((option->flags & flags) == flags) ) {
       val = choice_fuzzycmp( options->name, str );
       if( val >= 0 && val < INT_MAX ) {
         if( val < max ) {
@@ -344,10 +350,12 @@ static option_t* option_by_name( option_t* options, const char* str ) {
 
 /**
  * Lookup by abbreviation.
+ * Additionally, filter by the given flags. All given flags need to be set.
+ * No flags - no filtering.
  */
-static option_t* option_by_abbr( option_t* options, char c ) {
+static option_t* option_by_abbr( option_t* options, int flags, char c ) {
   while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->abbr != '\0' && options->abbr == c ) {
+    if( options->abbr != '\0' && ((options->flags & flags) == flags) && options->abbr == c ) {
       return options;
     }
     options++;
@@ -490,6 +498,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           break;
         }
       case S_ARG:
+        /* TODO: try to find a NODASH option */
         if( option == NULL ) {
           /* TODO: keep looking */
           state = S_DONE;
@@ -507,7 +516,8 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           arg_shiftstr( &command );
           state = S_ANY;
         } else {
-          option = option_by_abbr( command.options, abbr );
+          /* todo, only match with OPTION_NODASH not set */
+          option = option_by_abbr( command.options, 0, abbr );
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option -%c!\n", abbr );
@@ -538,7 +548,8 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           arg_shiftstr( &command );
           state = S_DONE;
         } else {
-          option = option_by_name( command.options, name );
+          /* todo, only match with OPTION_NODASH not set */
+          option = option_by_name( command.options, 0, name );
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option --%s!\n", name );
@@ -590,7 +601,7 @@ int subopt_parse( option_t* options, char* argv ) {
     arg  = strchrnul( name, '=' );
     if( arg[0] == '=' ) *arg++ = '\0';
 
-    option = option_by_name( options, name );
+    option = option_by_name( options, OPTION_NODASH, name );
     if( option == NULL ) {
       /* unknown option */
       return 1;

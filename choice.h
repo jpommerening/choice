@@ -47,8 +47,9 @@ typedef enum {
   OPTION_REQARG = 1,
   OPTION_OPTARG = 2,
   OPTION_ARG = 3,
-  OPTION_CALLED = 4,
-  OPTION_MULTIPLE = 8
+  OPTION_NODASH = 4,
+  OPTION_MULTIPLE = 8,
+  OPTION_CALLED = 16
 } option_flag_t;
 
 typedef struct option_s option_t;

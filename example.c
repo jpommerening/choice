@@ -20,19 +20,26 @@ static struct {
   1024
 };
 
+int option_subcommand() {
+}
+
 static option_t subopts[] = {
-  { "rw", "read-write mode", '\0', 0, &option_true, &config.write },
-  { "ro", "read-only mode", '\0', 0, &option_false, &config.write },
-  { "bs", "block size", '\0', OPTION_REQARG, &option_long, &config.bsize },
+  { "rw", "read-write mode", '\0', OPTION_NODASH, &option_true, &config.write },
+  { "ro", "read-only mode", '\0', OPTION_NODASH, &option_false, &config.write },
+  { "bs", "block size", '\0', OPTION_REQARG|OPTION_NODASH, &option_long, &config.bsize },
   OPTION_EOL
+};
+
+static option_t insopts[] = {
+  { "optional", "optional arg", 'o', OPTION_OPTARG, &option_long, &config.optional },
+  { "subopt", "extra options", 's', OPTION_REQARG, &option_subopt, &(subopts[0]) },
 };
 
 static option_t options[] = {
   { "verbose", "enable verbose stuff", 'v', 0, &option_true, &config.verbose },
   { "required", "required arg", 'r', OPTION_REQARG, &option_str, &config.required },
-  { "optional", "optional arg", 'o', OPTION_OPTARG, &option_long, &config.optional },
-  { "subopt", "extra options", 's', OPTION_REQARG, &option_subopt, &(subopts[0]) },
   { "help", "display help", 'h', 0, &option_true, &config.help },
+  { "install", "the install subcommand", '\0', OPTION_NODASH, &option_subcommand, &(insopts[0]) },
   OPTION_EOL
 };
 
