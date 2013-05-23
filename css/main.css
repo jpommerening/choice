@@ -261,6 +261,11 @@ article {
   padding: 0 0 1em;
   clear: both;
 }
+section {
+  float: left;
+  width: 66%;
+  padding-left: 2%;
+}
 section.slim {
   float: left;
   width: 32%;

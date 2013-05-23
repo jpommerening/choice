@@ -35,10 +35,50 @@
         </div>
 
         <article>
+
+        <div class="clearfix">
         <section>
           <h2>What is this?</h2>
-          <p>Choice is a ..</p>
+
+          <p>Choice is a parser for command-line options with support for
+          fuzzy option matching and generating command completion.</p>
+
+          <p>It is just two files and not even a thousand <abbr>NLOC</abbr> with all
+          the bells and whistles you can ask for.</p>
         </section>
+        </div>
+
+        <div class="clearfix">
+        <section>
+          <h2>Why should I need this?</h2>
+
+          <p>I spend most of my day in <em>xterm</em> and OS X' <em>Terminal</em>.
+          There's a lot of typing going on. There are so may awesome command-line
+          utilities out there, but I wish there were more of them.</p>
+
+          <p>As a heavy command-line user, I've grown pretty accustomed to the
+          behaviour of <code>getopt()</code>. The combination of long and short
+          options works surprisingly well. I don't care <em>what</em> parses the
+          options.</p>
+
+          <p>But when I write yet-another-utility-program, what I'm often struggling
+          with is designing the command-line switches for a great experience.
+          More often than not, I just want to get the job done, and couldn't
+          care less about the usability.</p>
+
+          <p>But usability matters. So to solve the problem once and for all, here
+          is one more option parser. There's no excuse anymore for those crufty
+          <code>while</code>-<code>switch</code> loops.</p>
+
+          <p>I can not recall how many ad-hoc option parsers I have written,
+          but it's probably been a few too many.
+          You start with a simple loop, looking for the one single flag
+          you program understands and it goes downhill from there. After a short
+          struggle, you end up sucking it up to <code>getopt</code> and its not quite
+          portable cousin <code>getopt_long</code> and that is that.</p>
+        </section>
+
+        </div>
 
         <hr/>
 
@@ -82,7 +122,7 @@
         </ul>
         </section>
 
-      </div>
+        </div>
 
         </article>
 
