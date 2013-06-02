@@ -50,6 +50,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <setjmp.h>
 
 /* MARK: option callbacks *//**
  * @name option callbacks
@@ -173,6 +174,19 @@ int option_subopt( option_t* option, const char* arg ) {
 }
 
 /** @} */
+
+typedef struct command_s command_t;
+
+struct command_s {
+  option_t* options;
+  const char* name;
+  int argc;
+  char** argv;
+  jmp_buf exc;
+};
+
+__attribute__((noreturn))
+static void option_error( command_t* command, option_t* option, int errno, const char* arg );
 
 /* MARK: comparators *//**
  * @name comparators
@@ -326,11 +340,12 @@ static int levenshtein( const char* str1, size_t len1,
  * Additionally, filter by the given flags. All given flags need to be set.
  * No flags - no filtering.
  */
-static option_t* option_by_name( option_t* options, int flags, const char* str ) {
+static option_t* option_by_name( command_t* command, int flags, const char* str ) {
+  option_t* options = command->options;
   option_t* option = NULL;
   int val, max = INT_MAX;
   while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->name != NULL && ((option->flags & flags) == flags) ) {
+    if( options->name != NULL && ((options->flags & flags) == flags) ) {
       val = choice_fuzzycmp( options->name, str );
       if( val >= 0 && val < INT_MAX ) {
         if( val < max ) {
@@ -338,8 +353,7 @@ static option_t* option_by_name( option_t* options, int flags, const char* str )
           option = options;
         } else if( val == max ) {
           /* ambiguous */
-          fprintf( stderr, "ambiguous option --%s, could be --%s, --%s\n", str, option->name, options->name );
-          return NULL;
+          option_error( command, option, OPTION_EAMBIG, str );
         }
       }
     }
@@ -353,7 +367,8 @@ static option_t* option_by_name( option_t* options, int flags, const char* str )
  * Additionally, filter by the given flags. All given flags need to be set.
  * No flags - no filtering.
  */
-static option_t* option_by_abbr( option_t* options, int flags, char c ) {
+static option_t* option_by_abbr( const command_t* command, int flags, char c ) {
+  option_t* options = command->options;
   while( options->name != NULL || options->abbr != '\0' ) {
     if( options->abbr != '\0' && ((options->flags & flags) == flags) && options->abbr == c ) {
       return options;
@@ -364,15 +379,6 @@ static option_t* option_by_abbr( option_t* options, int flags, char c ) {
 }
 
 /** @} */
-
-typedef struct command_s command_t;
-
-struct command_s {
-  option_t* options;
-  const char* name;
-  int argc;
-  char** argv;
-};
 
 /* MARK: argv dissection *//**
  * @name argv dissection
@@ -426,22 +432,7 @@ static char* arg_shiftstrchr( command_t* command, char c ) {
  * @{
  */
 
-static int option_callback( option_t* option, const char* arg ) {
-  if( arg != NULL && *arg == '\0' )
-    arg = NULL;
-
-  if( arg == NULL && (option->flags & OPTION_REQARG) )
-    return OPTION_EREQARG;
-  else if( arg != NULL && !(option->flags & OPTION_ARG) )
-    return OPTION_ENOARG;
-
-  if( option->callback )
-    return (option->callback)( option, arg );
-
-  return 0;
-}
-
-static int option_error( option_t* option, int errno, const char* arg ) {
+static void option_error( command_t* command, option_t* option, int errno, const char* arg ) {
   switch( errno ) {
     case OPTION_EINVAL:
       fprintf( stderr, "unknown option: `--%s'\n", arg );
@@ -460,7 +451,22 @@ static int option_error( option_t* option, int errno, const char* arg ) {
       fprintf( stderr, "option --%s is ambiguous (maybe --%s)\n", arg, option->name );
       break;
   }
-  return errno;
+  longjmp( command->exc, errno );
+}
+
+static int option_callback( option_t* option, const char* arg ) {
+  if( arg != NULL && *arg == '\0' )
+    arg = NULL;
+
+  if( arg == NULL && (option->flags & OPTION_REQARG) )
+    return OPTION_EREQARG;
+  else if( arg != NULL && !(option->flags & OPTION_ARG) )
+    return OPTION_ENOARG;
+
+  if( option->callback )
+    return (option->callback)( option, arg );
+
+  return 0;
 }
 
 int option_parse( option_t* options, int argc, char* argv[] ) {
@@ -477,7 +483,11 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
   char* name;
   char abbr;
   char* arg;
-  int state = S_ANY;
+  int state = S_ANY, error = 0;
+
+  if( (error = setjmp(command.exc)) ) {
+    return error;
+  }
 
   while( command.argc > 0 ) {
 
@@ -496,11 +506,11 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
             state = S_ABBR;
           }
           break;
+        } else {
+          /* TODO: try to find a NODASH option */
         }
       case S_ARG:
-        /* TODO: try to find a NODASH option */
         if( option == NULL ) {
-          /* TODO: keep looking */
           state = S_DONE;
         } else {
           arg = arg_shiftstr( &command );
@@ -517,7 +527,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           state = S_ANY;
         } else {
           /* todo, only match with OPTION_NODASH not set */
-          option = option_by_abbr( command.options, 0, abbr );
+          option = option_by_abbr( &command, 0, abbr );
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option -%c!\n", abbr );
@@ -549,7 +559,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
           state = S_DONE;
         } else {
           /* todo, only match with OPTION_NODASH not set */
-          option = option_by_name( command.options, 0, name );
+          option = option_by_name( &command, 0, name );
           if( option == NULL ) {
             /* unknown option */
             fprintf( stderr, "unknown option --%s!\n", name );
@@ -590,6 +600,7 @@ int option_parse( option_t* options, int argc, char* argv[] ) {
 
 int subopt_parse( option_t* options, char* argv ) {
   option_t* option = NULL;
+  command_t command = { options, NULL, 1, &argv };
 
   char* name;
   char* arg;
@@ -601,7 +612,7 @@ int subopt_parse( option_t* options, char* argv ) {
     arg  = strchrnul( name, '=' );
     if( arg[0] == '=' ) *arg++ = '\0';
 
-    option = option_by_name( options, OPTION_NODASH, name );
+    option = option_by_name( &command, OPTION_NODASH, name );
     if( option == NULL ) {
       /* unknown option */
       return 1;

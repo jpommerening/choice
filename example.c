@@ -21,6 +21,7 @@ static struct {
 };
 
 int option_subcommand() {
+  return 0;
 }
 
 static option_t subopts[] = {
@@ -33,6 +34,7 @@ static option_t subopts[] = {
 static option_t insopts[] = {
   { "optional", "optional arg", 'o', OPTION_OPTARG, &option_long, &config.optional },
   { "subopt", "extra options", 's', OPTION_REQARG, &option_subopt, &(subopts[0]) },
+  OPTION_EOL
 };
 
 static option_t options[] = {
@@ -63,10 +65,10 @@ static void help() {
 }
 
 int main( int argc, char* argv[] ) {
-  option_parse( options, argc, argv );
+  option_parse( &(options[0]), argc, argv );
 
   if( config.help ) {
-    help( options );
+    help();
     return 0;
   } else {
     printf( "verbose: %s, required: %s, optional: %li, write: %s, bsize: %li\n",
