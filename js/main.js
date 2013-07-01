@@ -6,19 +6,21 @@
     var name = argv.shift();
     var Module = Choice(T);
     Module.callMain(argv);
-    T.prompt(P);
+    setTimeout(function() { T.prompt(P); T.$cursor.focus(); }, 0);
   }
 
   T.prompt(P);
   T.$textarea.focus();
 
   function typein(str) {
-    var i = setInterval(function() {
-      T.type(str[0]);
-      str = str.slice(1);
-      if( !str ) {
-        T.type(13);
-        clearInterval(i);
+    var intv = setInterval(function typist() {
+      if (str.length) {
+        T.type(str[0]);
+        str = str.slice(1);
+      } else {
+        T.enter();
+        clearInterval(intv);
+        intv = null;
       }
     }, 90);
   }

@@ -24,15 +24,52 @@
 // Terminal plugin
 (function ($) {
   function Terminal(element, options) {
-    this.options = options;
-    this.callback = function() {};
-    this.readline = new Readline();
-
+    var $element = $(element);
     var $cursor = $('<span class="cursor">&nbsp;</span>');
     var $textarea = $('<textarea rows="1" cols="1" style="opacity: 0;"></textarea>');
     var $kbdinput = $('<kbd></kbd>');
-    $textarea.on('keypress', $.proxy(this.keypress, this));
-    $textarea.on('keydown', $.proxy(this.keydown, this));
+
+    this.options = options;
+    this.callback = function() {};
+    this.readline = new LineEdit(new Events());
+    new Move(this.readline);
+    new Edit(this.readline);
+    new History(this.readline);
+    new Kill(this.readline);
+    new Completion(this.readline, function() { return ["--verbose","--help"]});
+
+    var that = this;
+
+    new Input(this.readline, $textarea);
+    new Binding(this.readline);
+
+    this.readline.on('konami-code', function() {
+      console.log("yay");
+    });
+
+    this.readline.on('change', function(str) {
+      that.kbd(str);
+    });
+    this.readline.on('move', function(col) {
+      that.kbd(col);
+    });
+    this.readline.on('accept-line', function() {
+      var text = this.line;
+      console.log("accept", text);
+      this.trigger('end-of-line');
+      that.println();
+      that.callback(text);
+    });
+    this.readline.on('completions', function(completions) {
+      this.trigger('end-of-line');
+      that.println();
+      for (var i=0; i<completions.length; i++ ) {
+        that.println(completions[i]);
+      }
+      that.prompt(that.PS1, that.callback);
+      that.kbd();
+    });
+
     $textarea.on('focus', function() {
       $cursor.addClass('pulse');
     });
@@ -40,7 +77,7 @@
       $cursor.removeClass('pulse');
     });
 
-    this.$element = $(element);
+    this.$element = $element;
     this.$cursor = $cursor;
     this.$textarea = $textarea;
     this.$kbdinput = $kbdinput;
@@ -51,151 +88,37 @@
     this.$element.on('focus', function() { $textarea.focus(); });
   }
 
-  function Readline() {
-    this.cursor = 0; /* character offset in current line */
-    this.line = 0; /* currently selected history line */
-    this.top = 0; /* current top of history */
-    this.previous = ''; /* backup for history line */
-    this.history = ['']; /* history */
-    this.overwrite = false; /* overwrite/insert mode */
-  }
-
-  Readline.prototype = {
-    constructor: Readline
-  , jump: function(line) {
-      if (line >= 0 && line <= this.top) {
-        if (this.line != this.top)
-          this.history[this.line] = this.previous;
-        this.line = line;
-        this.previous = this.history[line];
-      }
-    }
-  , text: function() {
-      return this.history[this.line];
-    }
-  /* Moving:
-   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-Moving.html */
-  , 'beginning-of-line': function() {
-      this.cursor = 0;
-    }
-  , 'end-of-line': function() {
-      this.cursor = this.history[this.line].length;
-    }
-  , 'forward-char': function() {
-      if (this.cursor < this.history[this.line].length) this.cursor += 1;
-    }
-  , 'backward-char': function() {
-      if (this.cursor > 0) this.cursor -= 1;
-    }
-  , 'forward-word': function() {
-      var offset = this.history[this.line].indexOf(' ', this.cursor);
-      if (offset < 0) {
-        this['end-of-line']();
-      } else {
-        this.cursor = offset;
-      }
-    }
-  , 'backward-word': function() {
-      var offset = this.history[this.line].lastIndexOf(' ', this.cursor);
-      if (offset < 0) {
-        this['beginning-of-line']();
-      } else {
-        this.cursor = offset;
-      }
-    }
-  /* History:
-   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-History.html */
-  , 'accept-line': function() {
-      if (this.history[this.line]) {
-        if (this.top != this.line) {
-          this.history[this.top] = this.history[this.line];
-          this.history[this.line] = this.previous;
-        }
-        this.history.push('');
-        this.previous = '';
-        this.cursor = 0;
-        this.line = this.top = this.history.length - 1;
-      }
-    }
-  , 'previous-history': function() {
-      this.jump(this.line-1);
-      this['end-of-line']();
-    }
-  , 'next-history': function() {
-      this.jump(this.line+1);
-      this['end-of-line']();
-    }
-  , 'beginning-of-history': function() {
-      this.jump(0);
-      this['end-of-line']();
-    }
-  , 'end-of-history': function() {
-      this.jump(this.top);
-      this['end-of-line']();
-    }
-  , 'reverse-search-history': function() {
-    }
-  , 'forward-search-history': function() {
-    }
-  , 'history-search-forward': function() {
-      var prefix = this.text().substr(0, this.cursor);
-      var line = this.line;
-      while (++line < this.top) {
-        if (this.history[line].substr(0, prefix.length) === prefix) {
-          this.line = line;
-          return;
-        }
-      }
-    }
-  , 'history-search-backward': function() {
-      var prefix = this.text().substr(0, this.cursor);
-      var line = this.line;
-      while (--line >= 0) {
-        if (this.history[line].substr(0, prefix.length) === prefix) {
-          this.line = line;
-          return;
-        }
-      }
-    }
-  /* Changing Text
-   * http://www.gnu.org/software/bash/manual/html_node/Commands-For-Text.html */
-  , 'delete-char': function() {
-      var text = this.history[this.line];
-      var cursor = this.cursor;
-      this.history[this.line] = ( text.substr(0, cursor) + text.substr(cursor+1) );
-    }
-  , 'backward-delete-char': function(num) {
-      var text = this.history[this.line];
-      var cursor = this.cursor;
-      if (typeof num === 'undefined') num = 1;
-      if (cursor < num) num = cursor;
-      this.history[this.line] = ( text.substr(0, cursor-num) + text.substr(cursor) );
-      this.cursor -= num;
-  }
-  , 'forward-backward-delete-char': function() {
-      var text = this.history[this.line];
-      var cursor = this.cursor;
-      if (cursor >= text.length)
-        this['backward-delete-char']();
-      else
-        this['delete-char']();
-    }
-  , 'self-insert': function(str) {
-      var text = this.history[this.line];
-      var cursor = this.cursor;
-      var overwrite = this.overwrite ? str.length : 0;
-      this.history[this.line] = ( text.substr(0, cursor) + str + text.substr(cursor+overwrite) );
-      this.cursor += str.length;
-    }
-  , 'overwrite-mode': function(mode) {
-      this.overwrite = (mode === undefined) ? !(this.overwrite) : !!(mode);
-    }
-  };
-
   var escElem = $('<div/>');
   function escapeHtml(str) {
     return escElem.text(str).html();
   }
+
+    var names = {
+      RUBOUT: 8,
+      TAB: 9,
+      LFD: 10,
+      NEWLINE: 10,
+      RET: 13,
+      RETURN: 13,
+      ESC: 27,
+      ESCAPE: 27,
+      SPC: 32,
+      SPACE: 32,
+      PGUP: 33,
+      PAGEUP: 33,
+      PGDN: 34,
+      PAGEDOWN: 34,
+      END: 35,
+      HOME: 36,
+      LEFT: 37,
+      UP: 38,
+      RIGHT: 39,
+      DOWN: 40,
+      INS: 45,
+      INSERT: 45,
+      DEL: 46,
+      DELETE: 46
+    };
 
   Terminal.prototype = {
     
@@ -204,41 +127,13 @@
   , PS1: (window.location.host || 'Terminal') + ' $ '
   , PS2: ' > '
 
-  , repeat: {
-      delay: 1000,
-      rate: 7/1000
-    }
-
-  , commands: {
-          /* backspace */
-       8: 'backward-delete-char'
-          /* page up */
-    , 33: 'history-search-backward'
-          /* page down */
-    , 34: 'history-search-forward'
-          /* end */
-    , 35: 'end-of-line'
-          /* home */
-    , 36: 'beginning-of-line'
-          /* left */
-    , 37: 'backward-char'
-          /* up */
-    , 38: 'previous-history'
-          /* right */
-    , 39: 'forward-char'
-          /* down */
-    , 40: 'next-history'
-    }
-
-  , colors: {
-    }
-
   , print: function(output, cls) {
       if (output) {
         var samp = $('<samp' + (cls?' class="'+cls+'"':'') + '></samp>').text(output);
         this.$cursor.before(samp);
         if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
         this.$cursor.before(this.$kbdinput);
+        this.$element.scrollTop(this.$element[0].scrollHeight);
       }
     }
 
@@ -250,6 +145,7 @@
       this.$cursor.before('<br/>');
       if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
       this.$cursor.before(this.$kbdinput);
+      this.$element.scrollTop(this.$element[0].scrollHeight);
     }
 
   , prompt: function(output, callback) {
@@ -261,9 +157,13 @@
       this.callback = callback;
     }
 
-  , kbd: function() {
+  , kbd: function(param) {
       var cursor = this.readline.cursor;
-      var buffer = this.readline.text();
+      var buffer = this.readline.line;
+      if (typeof param === 'string')
+        buffer = param;
+      else if (typeof param === 'number')
+        cursor = param;
       if (cursor >= buffer.length) {
         this.$cursor.text(" ");
         this.$kbdinput.text(buffer);
@@ -278,39 +178,16 @@
         this.$kbdinput.append(this.$cursor);
         this.$kbdinput.append(escapeHtml(post));
       }
+      this.$element.scrollTop(this.$element[0].scrollHeight);
     }
 
   , type: function(str) {
-      if (typeof str === 'number') {
-        switch(str) {
-          case 13:
-          case 10:
-            this.readline['end-of-line']();
-            var text = this.readline.text();
-            this.kbd();
-            this.readline['accept-line']();
-            this.println();
-            this.callback( text );
-            return;
-        }
-        this.kbd();
-      } else {
-        this.readline['self-insert'](str);
-        this.kbd();
-      }
+      this.readline.trigger('self-insert', str);
     }
 
-  , keydown: function(event) {
-      if (this.commands.hasOwnProperty(event.which))
-        this.readline[this.commands[event.which]]();
-      else
-        this.type(event.which);
-      this.kbd();
-    }
-
-  , keypress: function(event) {
-      if (event.which >= 32)
-        this.type(String.fromCharCode(event.which));
+  , enter: function(str) {
+      if (str) this.type(str);
+      this.readline.trigger('accept-line');
     }
 
   };

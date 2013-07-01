@@ -1,0 +1,3 @@
+[submodule "js/lineedit"]
+	path = js/lineedit
+	url = https://github.com/jpommerening/lineedit.git
