@@ -93,35 +93,12 @@
     return escElem.text(str).html();
   }
 
-    var names = {
-      RUBOUT: 8,
-      TAB: 9,
-      LFD: 10,
-      NEWLINE: 10,
-      RET: 13,
-      RETURN: 13,
-      ESC: 27,
-      ESCAPE: 27,
-      SPC: 32,
-      SPACE: 32,
-      PGUP: 33,
-      PAGEUP: 33,
-      PGDN: 34,
-      PAGEDOWN: 34,
-      END: 35,
-      HOME: 36,
-      LEFT: 37,
-      UP: 38,
-      RIGHT: 39,
-      DOWN: 40,
-      INS: 45,
-      INSERT: 45,
-      DEL: 46,
-      DELETE: 46
-    };
+  function scrollToBottom($element) {
+    $element.scrollTop($element[0].scrollHeight);
+  }
 
   Terminal.prototype = {
-    
+
     constructor: Terminal
 
   , PS1: (window.location.host || 'Terminal') + ' $ '
@@ -133,7 +110,7 @@
         this.$cursor.before(samp);
         if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
         this.$cursor.before(this.$kbdinput);
-        this.$element.scrollTop(this.$element[0].scrollHeight);
+        scrollToBottom(this.$element);
       }
     }
 
@@ -145,7 +122,7 @@
       this.$cursor.before('<br/>');
       if( this.$kbdinput.html() ) this.$kbdinput = $('<kbd></kbd>');
       this.$cursor.before(this.$kbdinput);
-      this.$element.scrollTop(this.$element[0].scrollHeight);
+      scrollToBottom(this.$element);
     }
 
   , prompt: function(output, callback) {
@@ -178,7 +155,7 @@
         this.$kbdinput.append(this.$cursor);
         this.$kbdinput.append(escapeHtml(post));
       }
-      this.$element.scrollTop(this.$element[0].scrollHeight);
+      scrollToBottom(this.$element);
     }
 
   , type: function(str) {
