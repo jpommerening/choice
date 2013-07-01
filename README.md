@@ -95,7 +95,7 @@ optional: 0
 ## Credits
 
 Inspiration for this library was taken from @isaacs' `npm isntall`
-and @visionmedia's `commander.c`.  The levelshtein implementation was adapted
+and @visionmedia's `commander.c`.  The levenshtein implementation was adapted
 and extended from @schuyler's ruby module.  
 _Thank you!_
 
