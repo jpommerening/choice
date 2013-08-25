@@ -190,8 +190,14 @@ static void option_error( command_t* command, option_t* option, int errno, const
 
 /* MARK: comparators *//**
  * @name comparators
+ * All comparators are called with the option name first, followed by the
+ * actual option that the user passed to the program. The length parameter
+ * always refers to the length of the given option, which may be delimited
+ * by either a null-character or an equals sign.
  * @{
  */
+
+static int prefixlen( const char* string1, const char* string2, size_t len );
 
 static int levenshtein( const char *string1, size_t len1,
                         const char *string2, size_t len2,
@@ -205,8 +211,11 @@ static int levenshtein( const char *string1, size_t len1,
  *     ( "test", "test1" ) -> -1
  *     ( "test", "tes" ) -> -1
  */
-int choice_exactcmp( const char* target, const char* str ) {
-  return strcmp( target, str ) == 0 ? 0 : -1;
+int choice_exactcmp( const char* target, const char* str, size_t len ) {
+  int i = prefixlen( target, str, len );
+  if( i == len )
+    return target[i] == '\0' ? 0 : -1;
+  return -1;
 }
 
 /**
@@ -221,19 +230,13 @@ int choice_exactcmp( const char* target, const char* str ) {
  *     ( "test", "te" ) -> 2
  *     ( "test", "teapot" ) -> -4
  */
-int choice_prefixcmp( const char* target, const char* str ) {
-  char t, s = '\0';
-  int i;
-  while( (t = *target) != '\0' && (s = *str) != '\0' && t == s ) {
-    target++;
-    str++;
-  };
-  if( s == '\0' ) {
-    for( i=0; *target++ != '\0'; i++ );
-    return i;
+int choice_prefixcmp( const char* target, const char* str, size_t len ) {
+  int i = prefixlen( target, str, len ), j;
+  if( i == len ) {
+    for( j=i; target[j] != '\0'; j++ );
+    return j - i;
   } else {
-    for( i=0; *str++ != '\0'; i-- );
-    return i;
+    return i - (int) len;
   }
 }
 
@@ -253,13 +256,23 @@ int choice_prefixcmp( const char* target, const char* str ) {
  *     ( "test", "te" ) -> 2             // add two
  *     ( "test", "teapot" ) -> -7 (4-11) // sub two, ..?
  */
-int choice_fuzzycmp( const char* target, const char* str ) {
+int choice_fuzzycmp( const char* target, const char* str, size_t len ) {
   int lent = strlen( target );
-  int lens = strlen( str );
+  int lens = len;
   int dist = levenshtein(str, lens, target, lent, 2, 3, 1, 4);
-  if( dist >= lent )
-    return lent-dist-1;
+  if( dist > lent )
+    return lent-dist;
   return dist;
+}
+
+/**
+ * Return the length of the common prefix of the two strings, but at
+ * most `len`.
+ */
+static int prefixlen( const char* str1, const char* str2, size_t len ) {
+  int i = 0;
+  while( i < len && str1[i] != '\0' && str1[i] == str2[i] ) ++i;
+  return i;
 }
 
 /**
@@ -277,8 +290,9 @@ static int levenshtein( const char* str1, size_t len1,
   int i, j, next = 0;
 
   /* strip common prefixes */
-  while( len1 > 0 && len2 > 0 && str1[0] == str2[0] )
-    str1++, str2++, len1--, len2--;
+  i = prefixlen( str1, str2, len1 < len2 ? len1 : len2 );
+  str1 += i; len1 -= i;
+  str2 += i; len2 -= i;
 
   /* handle degenerate cases */
   if( !len1 ) return len2 * ins;
@@ -336,30 +350,60 @@ static int levenshtein( const char* str1, size_t len1,
  */
 
 /**
+ * Lookup an option with the given discriminator.
+ */
+static option_t* lookup_option( option_t* options, int (*by)( const option_t*, void* ), void* data ) {
+  option_t* option = NULL;
+  int val, max = INT_MAX;
+  while( options->name != NULL || options->abbr != '\0' ) {
+    val = (*by)( options, data );
+    if( val >= 0 && val < max ) {
+      max = val;
+      option = options;
+    } else if( val == max ) {
+      /* ambiguous */
+    }
+    options++;
+  }
+  return option;
+}
+
+typedef struct by_name_opts_s {
+  const char* str;
+  int flags;
+  size_t len;
+  int (*cmp)( const char*, const char*, size_t );
+} by_name_opts_t;
+
+static int by_name( const option_t* option, void* data ) {
+  by_name_opts_t* opts = data;
+  if( ((option->flags & opts->flags) == opts->flags) && option->name != NULL )
+    return (opts->cmp)( option->name, opts->str, opts->len );
+  else
+    return -1;
+}
+
+typedef struct by_abbr_opts_s {
+  char c;
+  int flags;
+} by_abbr_opts_t;
+
+static int by_abbr( const option_t* option, void* data ) {
+  by_abbr_opts_t* opts = data;
+  if( ((option->flags & opts->flags) == opts->flags) && option->abbr != '\0' )
+    return (option->abbr == opts->c) ? 0 : INT_MAX;
+  else
+    return -1;
+}
+
+/**
  * Lookup by name, disambiguate by result distance.
  * Additionally, filter by the given flags. All given flags need to be set.
  * No flags - no filtering.
  */
 static option_t* option_by_name( command_t* command, int flags, const char* str ) {
-  option_t* options = command->options;
-  option_t* option = NULL;
-  int val, max = INT_MAX;
-  while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->name != NULL && ((options->flags & flags) == flags) ) {
-      val = choice_fuzzycmp( options->name, str );
-      if( val >= 0 && val < INT_MAX ) {
-        if( val < max ) {
-          max = val;
-          option = options;
-        } else if( val == max ) {
-          /* ambiguous */
-          option_error( command, option, OPTION_EAMBIG, str );
-        }
-      }
-    }
-    options++;
-  }
-  return option;
+  by_name_opts_t opts = { str, flags, strlen( str ), choice_fuzzycmp };
+  return lookup_option( command->options, by_name, &opts );
 }
 
 /**
@@ -368,14 +412,8 @@ static option_t* option_by_name( command_t* command, int flags, const char* str 
  * No flags - no filtering.
  */
 static option_t* option_by_abbr( const command_t* command, int flags, char c ) {
-  option_t* options = command->options;
-  while( options->name != NULL || options->abbr != '\0' ) {
-    if( options->abbr != '\0' && ((options->flags & flags) == flags) && options->abbr == c ) {
-      return options;
-    }
-    options++;
-  }
-  return NULL;
+  by_abbr_opts_t opts = { c, flags };
+  return lookup_option( command->options, by_abbr, &opts );
 }
 
 /** @} */
@@ -639,7 +677,7 @@ int subopt_parse( option_t* options, char* argv ) {
 /** @} */
 
 #ifdef TESTS
-void distance_demo( int (*callback)( const char*, const char* ) ) {
+void distance_demo( int (*callback)( const char*, const char*, size_t ) ) {
   int i;
   struct {
     const char* a;
@@ -655,7 +693,7 @@ void distance_demo( int (*callback)( const char*, const char* ) ) {
   };
 
   for( i=0; i<(sizeof(lev)/sizeof(lev[0])); i++ ) {
-    lev[i].d = (callback)( lev[i].a, lev[i].b );
+    lev[i].d = (callback)( lev[i].a, lev[i].b, strlen(lev[i].b) );
     printf( "  ( \"%s\", \"%s\" ) -> %i\n", lev[i].a, lev[i].b, lev[i].d );
   }
 }
