@@ -44,6 +44,7 @@
  *   [ ] refactor parser loop
  */
 #include "choice.h"
+#include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -51,6 +52,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <setjmp.h>
+#include <errno.h>
 
 /* MARK: option callbacks *//**
  * @name option callbacks
@@ -126,7 +128,7 @@ static void pindent( const char* fmt, ... ) {
   va_end(vargs);
 }
 
-/** Print the classic option help, that we've come to expect from UNIX programs */
+/** Print the classic option help we've come to expect from UNIX programs */
 int option_help( option_t* option, const char* arg ) {
   bool nodash = option->flags & OPTION_NODASH;
   bool reqarg = option->flags & OPTION_REQARG;
@@ -175,6 +177,28 @@ int option_subopt( option_t* option, const char* arg ) {
 
 /** @} */
 
+/* MARK: error messages and handling *//**
+ * @name error messages and handling
+ * @{
+ */
+
+const char* option_error_txt[] = {
+  "unknown option `%s'",
+  "ambiguous options `%s'",
+  "option `%s' requires a parameter",
+  "option `%s' does not take any parameters"
+};
+
+char* option_strerror( int errnum ) {
+  return NULL;
+}
+
+int option_strerror_r( int errnum, char* strerrbuf, size_t buflen ) {
+  return 0;
+}
+
+/** @} */
+
 typedef struct command_s command_t;
 
 struct command_s {
@@ -184,9 +208,6 @@ struct command_s {
   char** argv;
   jmp_buf exc;
 };
-
-__attribute__((noreturn))
-static void option_error( command_t* command, option_t* option, int errno, const char* arg );
 
 /* MARK: comparators *//**
  * @name comparators
@@ -352,8 +373,10 @@ static int levenshtein( const char* str1, size_t len1,
 /**
  * Lookup an option with the given discriminator.
  */
-static option_t* lookup_option( option_t* options, int (*by)( const option_t*, void* ), void* data ) {
-  option_t* option = NULL;
+static const option_t* lookup_option( const option_t* options,
+                                      int (*by)( const option_t*, void* ),
+                                      void* data ) {
+  const option_t* option = NULL;
   int val, max = INT_MAX;
   while( options->name != NULL || options->abbr != '\0' ) {
     val = (*by)( options, data );
@@ -368,138 +391,62 @@ static option_t* lookup_option( option_t* options, int (*by)( const option_t*, v
   return option;
 }
 
-typedef struct by_name_opts_s {
+typedef struct lookup_opts_s {
   const char* str;
-  int flags;
   size_t len;
-  int (*cmp)( const char*, const char*, size_t );
-} by_name_opts_t;
+  option_cmp cmp;
+} lookup_opts_t;
 
-static int by_name( const option_t* option, void* data ) {
-  by_name_opts_t* opts = data;
-  if( ((option->flags & opts->flags) == opts->flags) && option->name != NULL )
+static int by_nodash( const option_t* option, void* data ) {
+  lookup_opts_t* opts = data;
+  if( option->flags & OPTION_NODASH && option->name != NULL )
     return (opts->cmp)( option->name, opts->str, opts->len );
   else
     return -1;
 }
 
-typedef struct by_abbr_opts_s {
-  char c;
-  int flags;
-} by_abbr_opts_t;
-
-static int by_abbr( const option_t* option, void* data ) {
-  by_abbr_opts_t* opts = data;
-  if( ((option->flags & opts->flags) == opts->flags) && option->abbr != '\0' )
-    return (option->abbr == opts->c) ? 0 : INT_MAX;
+static int by_dash( const option_t* option, void* data ) {
+  lookup_opts_t* opts = data;
+  if( option->abbr != '\0' )
+    return (option->abbr == opts->str[0]) ? 0 : INT_MAX;
   else
     return -1;
 }
 
-/**
- * Lookup by name, disambiguate by result distance.
- * Additionally, filter by the given flags. All given flags need to be set.
- * No flags - no filtering.
- */
-static option_t* option_by_name( command_t* command, int flags, const char* str ) {
-  by_name_opts_t opts = { str, flags, strlen( str ), choice_fuzzycmp };
-  return lookup_option( command->options, by_name, &opts );
-}
-
-/**
- * Lookup by abbreviation.
- * Additionally, filter by the given flags. All given flags need to be set.
- * No flags - no filtering.
- */
-static option_t* option_by_abbr( const command_t* command, int flags, char c ) {
-  by_abbr_opts_t opts = { c, flags };
-  return lookup_option( command->options, by_abbr, &opts );
+static int by_ddash( const option_t* option, void* data ) {
+  lookup_opts_t* opts = data;
+  if( !(option->flags & OPTION_NODASH) && option->name != NULL )
+    return (opts->cmp)( option->name, opts->str, opts->len );
+  else
+    return -1;
 }
 
 /** @} */
-
-/* MARK: argv dissection *//**
- * @name argv dissection
- * @{
- */
 
 #ifndef _GNU_SOURCE
 /**
  * This is a neat function, too bad it's not available everywhere.
  */
-static char* strchrnul( char* str, int c ) {
+static char* strchrnul( const char* str, int c ) {
   int d = *str;
   while( d != c && d != '\0' ) d = *(++str);
-  return str;
+  return (char*)str;
 }
 #endif
-
-/**
- * Shift one argument from the argv list.
- */
-static char* arg_shiftstr( command_t* command ) {
-  char* str = command->argv[0];
-  command->argc -= 1;
-  command->argv = &(command->argv[1]);
-  return str;
-}
-
-/**
- * Shift one character from the current argument.
- */
-static char arg_shiftc( command_t* command ) {
-  char c = command->argv[0][0];
-  command->argv[0] += 1;
-  return c;
-}
-
-/**
- * Shift characters from the current argument until either
- * the passed character or the end of the string is reached.
- */
-static char* arg_shiftstrchr( command_t* command, char c ) {
-  char* str = command->argv[0];
-  command->argv[0] = strchrnul( str, c );
-  return str;
-}
-
-/** @} */
 
 /* MARK: option parsing *//**
  * @name option parsing
  * @{
  */
 
-static void option_error( command_t* command, option_t* option, int errno, const char* arg ) {
-  switch( errno ) {
-    case OPTION_EINVAL:
-      fprintf( stderr, "unknown option: `--%s'\n", arg );
-      break;
-    case OPTION_ENOARG:
-      fprintf( stderr, "option --%s does not take any parameters (%s)\n",
-               option->name, arg );
-      break;
-    case OPTION_EREQARG:
-      fprintf( stderr, "option --%s requires a parameter\n", option->name );
-      break;
-    case OPTION_EONCE:
-      fprintf( stderr, "option --%s may only occur once\n", option->name );
-      break;
-    case OPTION_EAMBIG:
-      fprintf( stderr, "option --%s is ambiguous (maybe --%s)\n", arg, option->name );
-      break;
-  }
-  longjmp( command->exc, errno );
-}
-
 static int option_callback( option_t* option, const char* arg ) {
   if( arg != NULL && *arg == '\0' )
     arg = NULL;
 
   if( arg == NULL && (option->flags & OPTION_REQARG) )
-    return OPTION_EREQARG;
+    return EINVAL;
   else if( arg != NULL && !(option->flags & OPTION_ARG) )
-    return OPTION_ENOARG;
+    return EINVAL;
 
   if( option->callback )
     return (option->callback)( option, arg );
@@ -507,171 +454,126 @@ static int option_callback( option_t* option, const char* arg ) {
   return 0;
 }
 
-int option_parse( option_t* options, int argc, char* argv[] ) {
-  command_t command = { options, argv[0], argc - 1, &(argv[1]) };
-  option_t* option = NULL;
+#define IS_NODASH(x) (((x)[0] != '-') && ((x)[0] != '\0'))
+#define IS_DASH(x)   (((x)[0] == '-') && IS_NODASH(x+1))
+#define IS_DDASH(x)  (((x)[0] == '-') && IS_DASH(x+1))
+#define IS_END(x)    (((x)[0] == '-') && ((x)[1] == '-') && ((x)[2] == '\0'))
 
-#define S_ANY 0
-#define S_ARG 1
-#define S_ABBR 2
-#define S_NAME 3
-#define S_DONE 4
-#define ARG (command.argv[0])
-
-  char* name;
-  char abbr;
-  char* arg;
-  int state = S_ANY, error = 0;
-
-  if( (error = setjmp(command.exc)) ) {
-    return error;
-  }
-
-  while( command.argc > 0 ) {
-
-    switch( state ) {
-      case S_ANY:
-        if( ARG[0] == '-' ) {
-          if( option ) {
-            option_callback( option, NULL );
-            option = NULL;
-          }
-          if( ARG[1] == '-' ) {
-            ARG += 2;
-            state = S_NAME;
-          } else if( ARG[1] != '\0' ) {
-            ARG += 1;
-            state = S_ABBR;
-          }
-          break;
-        } else {
-          /* TODO: try to find a NODASH option */
-        }
-      case S_ARG:
-        if( option == NULL ) {
-          state = S_DONE;
-        } else {
-          arg = arg_shiftstr( &command );
-          option_callback( option, arg );
-          option = NULL;
-          state = S_ANY;
-        }
-        break;
-      case S_ABBR:
-        abbr = arg_shiftc( &command );
-        if( abbr == '\0' ) {
-          /* end of abbreviated option list */
-          arg_shiftstr( &command );
-          state = S_ANY;
-        } else {
-          /* todo, only match with OPTION_NODASH not set */
-          option = option_by_abbr( &command, 0, abbr );
-          if( option == NULL ) {
-            /* unknown option */
-            fprintf( stderr, "unknown option -%c!\n", abbr );
-            return OPTION_EINVAL;
-          }
-          if( option->flags & OPTION_ARG ) {
-            arg = arg_shiftstr( &command );
-            if( arg[0] != '\0' ) {
-              option_callback( option, arg );
-              option = NULL;
-              state = S_ANY;
-            } else {
-              state = (option->flags & OPTION_REQARG) ? S_ARG : S_ANY;
-            }
-          } else {
-            option_callback( option, NULL );
-            option = NULL;
-            state = S_ABBR;
-          }
-        }
-        break;
-      case S_NAME:
-        name = arg_shiftstrchr( &command, '=' );
-        arg  = arg_shiftstr( &command );
-        if( arg[0] == '=' ) *arg++ = '\0';
-        if( *name == '\0' ) {
-          /* "--" */
-          arg_shiftstr( &command );
-          state = S_DONE;
-        } else {
-          /* todo, only match with OPTION_NODASH not set */
-          option = option_by_name( &command, 0, name );
-          if( option == NULL ) {
-            /* unknown option */
-            fprintf( stderr, "unknown option --%s!\n", name );
-            return OPTION_EINVAL;
-          }
-          if( option->flags & OPTION_ARG ) {
-            if( arg[0] != '\0' ) {
-              option_callback( option, arg );
-              option = NULL;
-              state = S_ANY;
-            } else {
-              state = (option->flags & OPTION_REQARG) ? S_ARG : S_ANY;
-            }
-          } else if( arg[0] != '\0' ) {
-            /* does not take args */
-            fprintf( stderr, "option --%s does not take parameters (%s)!\n", option->name, arg );
-            return OPTION_ENOARG;
-          } else {
-            option_callback( option, NULL );
-            option = NULL;
-            state = S_ANY;
-          }
-        }
-        break;
-      case S_DONE:
-        return 0;
-    }
-  }
-
-#undef S_ANY
-#undef S_ARG
-#undef S_ABBR
-#undef S_NAME
-#undef S_DONE
-#undef ARG
+/**
+ */
+static int parse_arg( int argc, const char* argv[], const option_t* option ) {
   return 0;
 }
 
-int subopt_parse( option_t* options, char* argv ) {
-  option_t* option = NULL;
-  command_t command = { options, NULL, 1, &argv };
+/**
+ * Parse an argument that has no dashes. This might be a subcommand or an
+ * arbitary word.
+ * @return the number of arguments taken from argv, <=0 if an error occured.
+ */
+static int parse_nodash( int argc, const char* argv[], const option_t* options, option_cmp cmp ) {
+  lookup_opts_t opts = { NULL, 0, cmp };
+  const char* arg = argv[0];
+  const option_t* option;
+  assert( arg && IS_NODASH(arg) );
 
-  char* name;
-  char* arg;
+  opts.str = arg;
+  opts.len = strchrnul(opts.str, '=') - opts.str;
 
-  while( *argv != '\0' ) {
-    name = argv;
-    argv = strchrnul( argv, ',' );
-    if( argv[0] == ',' ) *argv++ = '\0';
-    arg  = strchrnul( name, '=' );
-    if( arg[0] == '=' ) *arg++ = '\0';
-
-    option = option_by_name( &command, OPTION_NODASH, name );
-    if( option == NULL ) {
-      /* unknown option */
-      return 1;
+  if ((option = lookup_option(options, by_nodash, &opts ))) {
+    if (OPTION_ARG & option->flags) {
+      // get arg
+      parse_arg(argc, argv, option);
     }
-    if( option->flags & OPTION_ARG ) {
-      if( arg[0] != '\0' ) {
-        (option->callback)( option, arg );
-        option = NULL;
-      } else {
-        /* requires arg */
-        return 1;
+
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+/**
+ * Parse an argument that starts with a single dash. The argument may
+ * contain multiple flags and a parameter.
+ * @return the number of arguments taken from argv, <=0 if an error occured.
+ */
+static int parse_dash( int argc, const char* argv[], const option_t* options ) {
+  lookup_opts_t opts = { NULL, 0, NULL };
+  const char* arg = argv[0];
+  const option_t* option;
+  assert( arg && IS_DASH(arg) );
+
+  /* strip the leading dash and iterate through the characters */
+  while (*(++arg) != '\0') {
+
+    opts.str = arg;
+    opts.len = 1;
+
+    if ((option = lookup_option(options, by_dash, &opts))) {
+      if (OPTION_ARG & option->flags) {
+        // get arg
+        parse_arg(argc, argv, option);
       }
-    } else if( arg[0] != '\0' ) {
-      /* does not take args */
-      return 1;
+
     } else {
-      (option->callback)( option, NULL );
-      option = NULL;
+      return -1;
     }
   }
-  return 0;
+  return 1;
+}
+
+/**
+ * Parse an argument that starts with a double dash.
+ * @return the number of arguments taken from argv, <=0 if an error occured.
+ */
+static int parse_ddash( int argc, const char* argv[], const option_t* options, option_cmp cmp ) {
+  lookup_opts_t opts = { NULL, 0, cmp };
+  const char* arg = argv[0];
+  const option_t* option;
+  assert( arg && IS_DDASH(arg) );
+
+  opts.str = arg+2;
+  opts.len = strchrnul(opts.str, '=') - opts.str;
+
+  if ((option = lookup_option(options, by_ddash, &opts))) {
+    if (OPTION_ARG & option->flags) {
+      // get arg
+      parse_arg(argc, argv, option);
+    }
+
+    return 1;
+  } else {
+    return -1;
+  }
+}
+
+static int parse_end( int argc, const char* argv[], const option_t* options ) {
+  const char* arg = argv[0];
+  assert( arg && IS_END(arg) );
+  return 0; // ?
+}
+
+static int parse_next( int argc, const char* argv[], const option_t* options, option_cmp cmp ) {
+  const char* arg;
+
+  if (argc > 0) {
+    arg = argv[0];
+  } else {
+    return 0;
+  }
+
+  if (arg[0] != '-') {
+    /* "nodash" */
+    return parse_nodash( argc, argv, options, cmp );
+  } else if (arg[1] != '-') {
+    /* "-dash" */
+    return parse_dash( argc, argv, options );
+  } else if (arg[2] != '\0') {
+    /* "--ddash" */
+    return parse_ddash( argc, argv, options, cmp );
+  } else {
+    /* "--" */
+    return parse_end( argc, argv, options );
+  }
 }
 
 /** @} */

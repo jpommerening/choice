@@ -31,17 +31,11 @@
 #ifndef __CHOICE_H
 #define __CHOICE_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <stddef.h>
-
-#define OPTION_EINVAL 1  /* invalid option */
-#define OPTION_ENOARG 2  /* option has no argument */
-#define OPTION_EREQARG 3 /* option requires an argument */
-#define OPTION_EONCE 4   /* option already seen */
-#define OPTION_EAMBIG 5  /* option is ambiguous */
 
 typedef enum {
   OPTION_REQARG = 1,
@@ -55,11 +49,12 @@ typedef enum {
 typedef struct option_s option_t;
 
 typedef int (*option_cb)( option_t* option, const char* arg );
+typedef int (*option_cmp)( const char* target, const char* arg, size_t len );
 
 struct option_s {
+  const char abbr;
   const char* name;
   const char* desc;
-  const char abbr;
   unsigned flags;
   option_cb callback;
   void* data;
@@ -73,19 +68,24 @@ extern int option_log( option_t* option, const char* arg );
 extern int option_help( option_t* option, const char* arg );
 extern int option_subopt( option_t* option, const char* arg );
 
-#define OPTION_TRUE(name, desc, abbr, bool_var) \
-  { name, desc, abbr, 0, option_true, &bool_var }
-#define OPTION_FALSE(name, desc, abbr, bool_var) \
-  { name, desc, abbr, 0, option_false, &bool_var }
-#define OPTION_LONG(name, desc, abbr, long_var) \
-  { name, desc, abbr, OPTION_REQARG, option_long, &long_var }
-#define OPTION_STR(name, desc, abbr, str_var) \
-  { name, desc, abbr, OPTION_REQARG, option_str, &str_var }
-#define OPTION_SUBOPT(name, desc, abbr, opts) \
-  { name, desc, abbr, OPTION_REQARG, option_subopt, &(opts[0]) }
-#define OPTION_EOL \
-  { NULL, NULL, '\0', 0, NULL, NULL }
+extern int option_exactcmp( const char* target, const char* arg, size_t len );
+extern int option_prefixcmp( const char* target, const char* arg, size_t len );
+extern int option_fuzzycmp( const char* target, const char* arg, size_t len );
 
+#define OPTION_TRUE(abbr, name, desc, bool_var) \
+  { abbr, name, desc, 0, option_true, &bool_var }
+#define OPTION_FALSE(abbr, name, desc, bool_var) \
+  { abbr, name, desc, 0, option_false, &bool_var }
+#define OPTION_LONG(abbr, name, desc, long_var) \
+  { abbr, name, desc, OPTION_REQARG, option_long, &long_var }
+#define OPTION_STR(abbr, name, desc, str_var) \
+  { abbr, name, desc, OPTION_REQARG, option_str, &str_var }
+#define OPTION_SUBOPT(name, desc, opts) \
+  { abbr, name, desc, OPTION_REQARG, option_subopt, &(opts[0]) }
+#define OPTION_EOL \
+  { '\0', NULL, NULL, 0, NULL, NULL }
+
+extern int option_error( const char* fmt, ... );
 extern int option_parse( option_t* options, int argc, char* argv[] );
 extern int subopt_parse( option_t* options, char *argv );
 
