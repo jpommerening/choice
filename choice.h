@@ -48,7 +48,7 @@ typedef enum {
 
 typedef struct option_s option_t;
 
-typedef int (*option_cb)( option_t* option, const char* arg );
+typedef int (*option_cb)( const option_t* option, const char* arg );
 typedef int (*option_cmp)( const char* target, const char* arg, size_t len );
 
 struct option_s {
@@ -60,13 +60,13 @@ struct option_s {
   void* data;
 };
 
-extern int option_true( option_t* option, const char* arg );
-extern int option_false( option_t* option, const char* arg );
-extern int option_long( option_t* option, const char* arg );
-extern int option_str( option_t* option, const char* arg );
-extern int option_log( option_t* option, const char* arg );
-extern int option_help( option_t* option, const char* arg );
-extern int option_subopt( option_t* option, const char* arg );
+extern int option_true( const option_t* option, const char* arg );
+extern int option_false( const option_t* option, const char* arg );
+extern int option_long( const option_t* option, const char* arg );
+extern int option_str( const option_t* option, const char* arg );
+extern int option_log( const option_t* option, const char* arg );
+extern int option_help( const option_t* option, const char* arg );
+extern int option_subopt( const option_t* option, const char* arg );
 
 extern int option_exactcmp( const char* target, const char* arg, size_t len );
 extern int option_prefixcmp( const char* target, const char* arg, size_t len );

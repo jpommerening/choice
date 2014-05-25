@@ -25,23 +25,23 @@ int option_subcommand() {
 }
 
 static option_t subopts[] = {
-  { "rw", "read-write mode", '\0', OPTION_NODASH, &option_true, &config.write },
-  { "ro", "read-only mode", '\0', OPTION_NODASH, &option_false, &config.write },
-  { "bs", "block size", '\0', OPTION_REQARG|OPTION_NODASH, &option_long, &config.bsize },
+  { '\0', "rw", "read-write mode", OPTION_NODASH, &option_true, &config.write },
+  { '\0', "ro", "read-only mode", OPTION_NODASH, &option_false, &config.write },
+  { '\0', "bs", "block size", OPTION_REQARG|OPTION_NODASH, &option_long, &config.bsize },
   OPTION_EOL
 };
 
 static option_t insopts[] = {
-  { "optional", "optional arg", 'o', OPTION_OPTARG, &option_long, &config.optional },
-  { "subopt", "extra options", 's', OPTION_REQARG, &option_subopt, &(subopts[0]) },
+  { 'o', "--optional", "optional arg", OPTION_OPTARG, &option_long, &config.optional },
+  { 's', "--subopt", "extra options", OPTION_REQARG, &option_subopt, &(subopts[0]) },
   OPTION_EOL
 };
 
 static option_t options[] = {
-  { "verbose", "enable verbose stuff", 'v', 0, &option_true, &config.verbose },
-  { "required", "required arg", 'r', OPTION_REQARG, &option_str, &config.required },
-  { "help", "display help", 'h', 0, &option_true, &config.help },
-  { "install", "the install subcommand", '\0', OPTION_NODASH, &option_subcommand, &(insopts[0]) },
+  { 'v', "verbose", "enable verbose stuff", 0, &option_true, &config.verbose },
+  { 'r', "required", "required arg", OPTION_REQARG, &option_str, &config.required },
+  { 'h', "help", "display help", 0, &option_true, &config.help },
+  { '\0', "install", "the install subcommand", OPTION_NODASH, &option_subcommand, &(insopts[0]) },
   OPTION_EOL
 };
 
@@ -65,7 +65,7 @@ static void help() {
 }
 
 int main( int argc, char* argv[] ) {
-  option_parse( &(options[0]), argc, argv );
+  option_parse( &(options[0]), argc-1, argv+1 );
 
   if( config.help ) {
     help();

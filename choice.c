@@ -60,35 +60,35 @@
  */
 
 /** Store `true` in variable pointed to by `option->data` */
-int option_true( option_t* option, const char* arg ) {
+int option_true( const option_t* option, const char* arg ) {
   if( option->data != NULL )
     *((bool*) option->data) = true;
   return 0;
 }
 
 /** Store `false` in variable pointed to by `option->data` */
-int option_false( option_t* option, const char* arg ) {
+int option_false( const option_t* option, const char* arg ) {
   if( option->data != NULL )
     *((bool*) option->data) = false;
   return 0;
 }
 
 /** Store a `long` number in variable pointed to by `option->data` */
-int option_long( option_t* option, const char* arg ) {
+int option_long( const option_t* option, const char* arg ) {
   if( option->data != NULL )
     *((long*) option->data) = (arg == NULL) ? 0 : atol(arg);
   return 0;
 }
 
 /** Store `arg` unmodified in variable pointed to by `option->data` */
-int option_str( option_t* option, const char* arg ) {
+int option_str( const option_t* option, const char* arg ) {
   if( option->data != NULL )
     *((const char**) option->data) = arg;
   return 0;
 }
 
 /** Write a line to `stdout` */
-int option_log( option_t* option, const char* arg ) {
+int option_log( const option_t* option, const char* arg ) {
   if( option->flags & OPTION_NODASH )
     printf( " %-14s", option->name );
   else if( option->name != NULL && option->abbr != '\0' )
@@ -129,7 +129,7 @@ static void pindent( const char* fmt, ... ) {
 }
 
 /** Print the classic option help we've come to expect from UNIX programs */
-int option_help( option_t* option, const char* arg ) {
+int option_help( const option_t* option, const char* arg ) {
   bool nodash = option->flags & OPTION_NODASH;
   bool reqarg = option->flags & OPTION_REQARG;
   bool optarg = option->flags & OPTION_OPTARG;
@@ -170,44 +170,12 @@ int option_help( option_t* option, const char* arg ) {
  * Parse the suboptions in the given `arg`.
  * See `subopt_parse` for more info.
  */
-int option_subopt( option_t* option, const char* arg ) {
+int option_subopt( const option_t* option, const char* arg ) {
   char* str = (char*)arg; /* Trust me, it's going to be fine. */
   return subopt_parse( option->data, str );
 }
 
 /** @} */
-
-/* MARK: error messages and handling *//**
- * @name error messages and handling
- * @{
- */
-
-const char* option_error_txt[] = {
-  "unknown option `%s'",
-  "ambiguous options `%s'",
-  "option `%s' requires a parameter",
-  "option `%s' does not take any parameters"
-};
-
-char* option_strerror( int errnum ) {
-  return NULL;
-}
-
-int option_strerror_r( int errnum, char* strerrbuf, size_t buflen ) {
-  return 0;
-}
-
-/** @} */
-
-typedef struct command_s command_t;
-
-struct command_s {
-  option_t* options;
-  const char* name;
-  int argc;
-  char** argv;
-  jmp_buf exc;
-};
 
 /* MARK: comparators *//**
  * @name comparators
@@ -459,9 +427,7 @@ static int option_callback( option_t* option, const char* arg ) {
 #define IS_DDASH(x)  (((x)[0] == '-') && IS_DASH(x+1))
 #define IS_END(x)    (((x)[0] == '-') && ((x)[1] == '-') && ((x)[2] == '\0'))
 
-/**
- */
-static int parse_arg( int argc, const char* argv[], const option_t* option ) {
+static int parse_arg( int argc, const char* argv[], const option_t* option, const char* arg ) {
   return 0;
 }
 
@@ -481,13 +447,22 @@ static int parse_nodash( int argc, const char* argv[], const option_t* options, 
 
   if ((option = lookup_option(options, by_nodash, &opts ))) {
     if (OPTION_ARG & option->flags) {
-      // get arg
-      parse_arg(argc, argv, option);
+      if (*arg == '=') {
+        option->callback(option, arg+1);
+        return 1;
+      } else if (*argv[1] != '-') {
+        option->callback(option, argv[1]);
+        return 2;
+      } else {
+        option->callback(option, NULL);
+        return 1;
+      }
+    } else {
+      option->callback(option, NULL);
+      return 1;
     }
-
-    return 1;
   } else {
-    return -1;
+    return 0;
   }
 }
 
@@ -510,10 +485,18 @@ static int parse_dash( int argc, const char* argv[], const option_t* options ) {
 
     if ((option = lookup_option(options, by_dash, &opts))) {
       if (OPTION_ARG & option->flags) {
-        // get arg
-        parse_arg(argc, argv, option);
+        if (*arg != '\0') {
+          option->callback(option, arg+1);
+          return 1;
+        } else if (*argv[1] != '-') {
+          option->callback(option, argv[1]);
+          return 2;
+        } else {
+          option->callback(option, NULL);
+        }
+      } else {
+        option->callback(option, NULL);
       }
-
     } else {
       return -1;
     }
@@ -536,23 +519,32 @@ static int parse_ddash( int argc, const char* argv[], const option_t* options, o
 
   if ((option = lookup_option(options, by_ddash, &opts))) {
     if (OPTION_ARG & option->flags) {
-      // get arg
-      parse_arg(argc, argv, option);
+      if (*arg == '=') {
+        option->callback(option, arg+1);
+        return 1;
+      } else if (*argv[1] != '-') {
+        option->callback(option, argv[1]);
+        return 2;
+      } else {
+        option->callback(option, NULL);
+        return 1;
+      }
+    } else {
+      option->callback(option, NULL);
+      return 1;
     }
-
-    return 1;
   } else {
-    return -1;
+    return 0;
   }
 }
 
-static int parse_end( int argc, const char* argv[], const option_t* options ) {
+static int parse_end( int argc, const char* argv[], option_t* options ) {
   const char* arg = argv[0];
   assert( arg && IS_END(arg) );
   return 0; // ?
 }
 
-static int parse_next( int argc, const char* argv[], const option_t* options, option_cmp cmp ) {
+static int parse_next( int argc, const char* argv[], option_t* options, option_cmp cmp ) {
   const char* arg;
 
   if (argc > 0) {
@@ -574,6 +566,19 @@ static int parse_next( int argc, const char* argv[], const option_t* options, op
     /* "--" */
     return parse_end( argc, argv, options );
   }
+}
+
+int option_parse( option_t* options, int argc, char* argv[] ) {
+  int p = 0;
+  while ((p = parse_next(argc, argv, options, &choice_fuzzycmp))) {
+    argc -= p;
+    argv += p;
+  }
+  return p;
+}
+
+int subopt_parse(option_t* options, char* argv) {
+  return 0;
 }
 
 /** @} */
